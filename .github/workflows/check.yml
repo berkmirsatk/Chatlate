@@ -14,4 +14,3 @@ jobs:
       - run: npm ci
       - run: npm run verify
       - run: npx inu verify dist/chatlate.inu.js
-      - run: python3 -m unittest discover -s .github/telegram -p 'test_*.py' -v

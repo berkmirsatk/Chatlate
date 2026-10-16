@@ -2,40 +2,29 @@ name: Sync Telegram changelogs
 on:
   push:
     branches: [main]
-    paths:
-      - CHANGELOG.md
-      - .github/telegram/channel-posts.json
-      - .github/telegram/post.rich.md
+    paths: [CHANGELOG.md]
   workflow_dispatch:
 
 permissions:
   contents: read
 
 concurrency:
-  group: telegram-channel-sync
+  group: telegram-sync-dispatch
   cancel-in-progress: false
 
 jobs:
-  sync:
+  notify:
     if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: 2
     steps:
-      - uses: actions/checkout@v4
-        with:
-          ref: main
-          persist-credentials: false
-      - uses: actions/setup-python@v5
-        with:
-          python-version: '3.12'
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 22
-          cache: npm
-      - run: npm ci
-      - run: npm run notes -- --all --body
-      - run: python3 -m unittest discover -s .github/telegram -p 'test_*.py' -v
-      - name: Edit registered channel announcements
+      - name: Ask Plumgins Bot to refresh Chatlate announcements
         env:
-          TELEGRAM_BOT_TOKEN: ${{ secrets.PLUMGINS_BOT_TOKEN }}
-        run: python3 .github/telegram/sync.py --notes-dir dist/release-notes
+          GH_TOKEN: ${{ secrets.PLUMGINS_GITHUB_TOKEN }}
+        run: |
+          if [ -z "$GH_TOKEN" ]; then
+            echo 'Set PLUMGINS_GITHUB_TOKEN to enable the separate bot workflow.' >&2
+            exit 1
+          fi
+          gh workflow run telegram-sync.yml --repo berkmirsatk/Plumgins-Bot \
+            --ref main --field plugin=chatlate
