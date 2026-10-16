@@ -1,0 +1,37 @@
+name: Prepare release
+on: workflow_dispatch
+
+jobs:
+  prepare:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run package
+      - name: Upload verified files to a draft Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          CHATLATE_VERSION=$(node -p "require('./package.json').version")
+          CHATLATE_TAG="v$CHATLATE_VERSION"
+          if gh release view "$CHATLATE_TAG" --json isDraft > /tmp/chatlate-release.json; then
+            node -e "if (!require('/tmp/chatlate-release.json').isDraft) throw Error('Release is already published')"
+            gh release edit "$CHATLATE_TAG" --target "$GITHUB_SHA" --notes-file RELEASE_NOTES.en.md
+          else
+            gh release create "$CHATLATE_TAG" --draft --target "$GITHUB_SHA" \
+              --title "Chatlate $CHATLATE_TAG" --notes-file RELEASE_NOTES.en.md
+          fi
+          gh release upload "$CHATLATE_TAG" \
+            "dist/Chatlate-$CHATLATE_VERSION.inu.js" \
+            "dist/Chatlate-$CHATLATE_VERSION.sha256" --clobber

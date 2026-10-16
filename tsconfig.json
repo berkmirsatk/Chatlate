@@ -1,0 +1,5 @@
+{
+  "extends": "@inugram/plugin-types/tsconfig.js.json",
+  "compilerOptions": { "noUnusedLocals": true, "noUnusedParameters": true },
+  "include": ["src/**/*.js", "src/**/*.d.ts", "inu.config.ts"]
+}
