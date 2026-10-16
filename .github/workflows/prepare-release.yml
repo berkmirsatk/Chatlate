@@ -34,4 +34,5 @@ jobs:
           fi
           gh release upload "$CHATLATE_TAG" \
             "dist/Chatlate-$CHATLATE_VERSION.inu.js" \
-            "dist/Chatlate-$CHATLATE_VERSION.sha256" --clobber
+            "dist/Chatlate-$CHATLATE_VERSION.sha256" \
+            "dist/Chatlate-$CHATLATE_VERSION.LICENSE.txt" --clobber

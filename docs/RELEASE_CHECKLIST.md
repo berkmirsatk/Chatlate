@@ -13,7 +13,7 @@ Run these checks on the final installation file. HTTP/JVM fixtures cannot verify
 - [ ] Disable Chatlate while selected: Telegram becomes active. Re-enable/restart: saved language, provider order and preferences return. External provider selections remain untouched.
 - [ ] English/Turkish interface, automatic app language, manual override, disabled-plugin description and language flags.
 - [ ] Expand/collapse community links, verify current titles/photos and responsive blue previews in both screen orientations.
-- [ ] GitHub opens this repository. Version history loads current English notes with readable Markdown and no footer links in either UI language. Reopening reflects an edited `CHANGELOG.md`; connection failures show Retry.
+- [ ] GitHub opens this repository. Version history loads current notes with readable Markdown and no footer links in either UI language. Reopening reflects an edited `CHANGELOG.md`; connection failures show Retry.
 - [ ] Support heart cycles smoothly; Buy Me a Coffee opens the correct profile. USDT shows TON and copies the exact configured address only on tap. No payment is required for this check.
 - [ ] Close/reopen settings during native work; check recycled views, listeners and rapid toggles. Review first-open banner corners separately.
 
@@ -28,7 +28,7 @@ Run these checks on the final installation file. HTTP/JVM fixtures cannot verify
 ## Publish
 
 - [ ] Keep `PLUGIN_VERSION`, package and lockfile versions equal; retain the plugin, provider and preference identities.
-- [ ] Add the English version section to `CHANGELOG.md`; keep previous sections. Verify generated GitHub and Telegram notes use that same text.
+- [ ] Add the version section to `CHANGELOG.md`; keep previous sections. Verify generated GitHub and Telegram notes use that same text.
 - [ ] Run `npm ci` and `npm run package` on the finished source. Review the staged file list; exclude credentials, dependencies, generated installers and demo files.
 - [ ] Create tag `vVERSION` from the reviewed commit and attach `dist/Chatlate-VERSION.inu.js` and `dist/Chatlate-VERSION.sha256` to its Release. The exact installer name is required by the updater.
 - [ ] Check the uploaded asset's SHA-256 and GitHub digest. Source archives include the GNU GPLv3 license and lockfile; source ZIPs are not installers.

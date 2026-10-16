@@ -68,7 +68,7 @@ export function createChangelogRequest(source, invalidate) {
   };
 }
 
-/** Render only freshly downloaded English notes for one version.
+/** Render only freshly downloaded release notes for one version.
  * @param {import('./index.js').ReleaseSource | null} source
  * @param {string} version @param {() => void} invalidate */
 export function createVersionNotes(source, version, invalidate) {

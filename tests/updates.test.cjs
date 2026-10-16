@@ -129,7 +129,7 @@ test('only newer stable releases appear; numeric comparison handles multi-digit 
   }
 });
 
-test('verified release loads current English notes in a localized UI and installs only after a tap', async () => {
+test('verified release loads current release notes in a localized UI and installs only after a tap', async () => {
   let checks = 0,
     installs = 0;
   const h = harness(

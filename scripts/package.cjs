@@ -29,6 +29,10 @@ execFileSync(npm, ['run', 'notes'], { cwd: project, stdio: 'inherit' });
 const name = `Chatlate-${version}.inu.js`;
 const output = path.join(project, 'dist', name);
 fs.copyFileSync(path.join(project, 'dist/chatlate.inu.js'), output);
+fs.copyFileSync(
+  path.join(project, 'LICENSE'),
+  path.join(project, 'dist', `Chatlate-${version}.LICENSE.txt`),
+);
 const checksum = createHash('sha256').update(fs.readFileSync(output)).digest('hex');
 fs.writeFileSync(
   path.join(project, 'dist', `Chatlate-${version}.sha256`),
