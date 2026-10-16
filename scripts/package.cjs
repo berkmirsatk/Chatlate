@@ -24,6 +24,7 @@ const cli = path.join(
 );
 execFileSync(npm, ['run', 'verify'], { cwd: project, stdio: 'inherit' });
 execFileSync(cli, ['verify', 'dist/chatlate.inu.js'], { cwd: project, stdio: 'inherit' });
+execFileSync(npm, ['run', 'notes'], { cwd: project, stdio: 'inherit' });
 
 const name = `Chatlate-${version}.inu.js`;
 const output = path.join(project, 'dist', name);

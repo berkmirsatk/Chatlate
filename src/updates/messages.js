@@ -15,6 +15,9 @@ const messages = {
     complete: 'Update complete',
     failed: 'Could not update. Try again.',
     missingNotes: 'Release notes are not available.',
+    loadingNotes: 'Loading release notes…',
+    notesFailed: 'Could not load release notes. Check your connection.',
+    retry: 'Try again',
   },
   tr: {
     title: 'Güncellemeler',
@@ -30,6 +33,9 @@ const messages = {
     complete: 'Güncelleme tamamlandı',
     failed: 'Güncelleme yapılamadı. Tekrar deneyin.',
     missingNotes: 'Sürüm notları mevcut değil.',
+    loadingNotes: 'Sürüm notları yükleniyor…',
+    notesFailed: 'Sürüm notları yüklenemedi. İnternet bağlantınızı kontrol edin.',
+    retry: 'Yeniden dene',
   },
 };
 

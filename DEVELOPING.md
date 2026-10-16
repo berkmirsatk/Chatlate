@@ -10,7 +10,7 @@ npm run verify
 npm run package
 ```
 
-`verify` checks formatting, types and the manifest, builds the classic-script IIFE and runs tests. `package` also validates release versions and native routine fingerprints, then writes the versioned installation file and checksum. Source archives are available from the repository; they are not installation files.
+`verify` checks formatting, types and the manifest, builds the classic-script IIFE and runs tests. `package` also validates release versions and native routine fingerprints, then writes the versioned installation file, checksum and generated Release notes. Source archives are available from the repository; they are not installation files.
 
 Run `npm run format` after editing code. The installer preserves indentation and line breaks; whitespace, identifiers and syntax are not minified. Keep both source modules and the distributed script readable.
 
@@ -57,7 +57,11 @@ The native installer verifies SHA-256 and the host-parsed plugin ID/version befo
 
 The controller cancels requests on close/unload. An installer handoff is not proof of completion: the next running instance confirms the pending target against its own version, then shows the completion effect when settings opens. Test actual native import, cancellation and page behavior on Android before announcing automatic updates.
 
-Keep old Markdown entries in `updates/notes/` and `updates/history.js` so version history remains readable offline. English is the fallback for missing translations. Release text supports Telegram's Markdown subset; GitHub headings outside code fences are normalized. The changelog styles only its own native cell, restoring colors, sizes and hooks on close/recycle.
+`CHANGELOG.md` on `main` is the single source of English release notes. Add each stable version under `## MAJOR.MINOR.PATCH` and retain previous sections. `npm run notes` generates the current Release body; `-- --all` generates one body per version, and `-- --body` omits the Release title for the Telegram post. The CLI and plugin share the section parser in `updates/changelog.js`.
+
+Version history, selected history entries and update pages fetch the current file on opening through GitHub's Contents API. Notes are neither bundled nor persisted. A failed request shows a localized retry action; closing a page aborts its request and disposes its renderer. The English content stays the same in either UI language. The SDK uses Telegram's Markdown subset, so GitHub headings outside code fences become bold lines. The changelog styles only its own transparent native cell, restoring colors, sizes and hooks on close/recycle.
+
+Pushing a `CHANGELOG.md` change to `main` runs **Sync release notes**, updating the bodies of existing GitHub Releases without changing their assets or creating new Releases. The manual Telegram preview inserts the same version section into its Rich Markdown template. **Sync Telegram changelogs** separately edits registered `@Plumgins` announcements from that source; its registry remains empty until publication. It never creates channel posts, changes installer attachments or imports Telegram edits back into GitHub. See [the Telegram tooling instructions](.github/telegram/README.md). Anonymous note requests cannot read a private repository; do not add credentials to the plugin.
 
 ## Version and publish
 

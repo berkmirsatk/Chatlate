@@ -1,18 +1,11 @@
 import { PLUGIN_VERSION } from '../identity.js';
-import { getLanguage } from '../i18n.js';
 import { HISTORY_ICON } from '../community-icons.js';
-import { createChangelogText } from './changelog-text.js';
+import { createChangelogRequest, createVersionNotes } from './remote-notes.js';
 import { updateMessages } from './messages.js';
-import { isNewer, parseVersion } from './version.js';
-import englishNotes from './notes/1.0.0.en.md';
-import turkishNotes from './notes/1.0.0.tr.md';
 
-/** Shipped notes stay available offline across upgrades. Add each release here.
- * @type {import('./index.js').Release[]} */
-const archive = [{ version: '1.0.0', notes: { en: englishNotes, tr: turkishNotes } }];
-
-/** @param {() => import('./index.js').Release | null} latest */
-export function createReleaseHistory(latest) {
+/** Version history is downloaded when opened; individual notes are refreshed on selection.
+ * @param {import('./index.js').ReleaseSource | null} source */
+export function createReleaseHistory(source) {
   const cleanups = new Set();
   let icon;
   try {
@@ -23,35 +16,25 @@ export function createReleaseHistory(latest) {
     } catch {}
   }
 
-  function entries() {
-    const releases = new Map(archive.map((entry) => [entry.version, entry]));
-    const candidate = latest();
-    // Bundled notes take precedence over remote notes for an archived version.
-    if (candidate && parseVersion(candidate.version) && !releases.has(candidate.version)) {
-      releases.set(candidate.version, candidate);
-    }
-    return [...releases.values()].sort((a, b) =>
-      a.version === b.version ? 0 : isNewer(a.version, b.version) ? -1 : 1,
-    );
-  }
-
-  /** @param {import('./index.js').Release} entry */
-  function openVersion(entry) {
-    const notes = entry.notes?.[getLanguage()] || entry.notes?.en || updateMessages().missingNotes;
-    const renderer = createChangelogText(inu.utils.md(notes));
+  function openVersion(version) {
+    let closed = false;
+    const notes = createVersionNotes(source, version, () => page.invalidate());
     function close() {
-      renderer.dispose();
+      if (closed) return;
+      closed = true;
+      notes.dispose();
       cleanups.delete(close);
     }
     const page = inu.ui.settingsPage({
-      title: 'Chatlate ' + entry.version,
+      title: 'Chatlate ' + version,
       transient: true,
       onClose: close,
-      items: () => [renderer.item()],
+      items: notes.items,
     });
     cleanups.add(close);
     try {
       inu.ui.openPage(page);
+      notes.load();
     } catch {
       close();
       page.dispose();
@@ -59,23 +42,39 @@ export function createReleaseHistory(latest) {
   }
 
   function open() {
-    const text = updateMessages();
+    let closed = false;
+    const request = createChangelogRequest(source, () => page.invalidate());
+    function close() {
+      if (closed) return;
+      closed = true;
+      request.dispose();
+      cleanups.delete(close);
+    }
     const page = inu.ui.settingsPage({
-      title: text.history,
+      title: updateMessages().history,
       transient: true,
-      items: () =>
-        entries().map((entry) =>
+      onClose: close,
+      items: () => {
+        const status = request.statusItems();
+        if (status.length) return status;
+        return request.entries().map((entry) =>
           inu.ui.button({
             id: 'release.history.' + entry.version,
             text: 'Chatlate ' + entry.version,
-            value: entry.version === PLUGIN_VERSION ? text.installed : undefined,
-            onClick: () => openVersion(entry),
+            value: entry.version === PLUGIN_VERSION ? updateMessages().installed : undefined,
+            onClick: () => {
+              if (!closed) openVersion(entry.version);
+            },
           }),
-        ),
+        );
+      },
     });
+    cleanups.add(close);
     try {
       inu.ui.openPage(page);
+      request.load();
     } catch {
+      close();
       page.dispose();
     }
   }

@@ -507,10 +507,11 @@ test('community menu keeps GitHub and permanent version history above support as
   assert.deepEqual(urls, ['https://github.com/berkmirsatk/Chatlate']);
   history.onClick();
   assert.equal(h.opened.title, 'Version history');
-  h.opened.items()[0].onClick();
-  assert.equal(h.opened.title, 'Chatlate 1.0.0');
-  assert.equal(h.opened.items()[0].onClick, undefined);
-  assert.match(h.opened.items()[0].text.text, /First release/);
+  await new Promise((resolve) => setTimeout(resolve, 5));
+  // The shared plugin harness models the repository as private (HTTP 404).
+  assert.match(h.opened.items()[0].text, /Could not load release notes/);
+  assert.equal(h.opened.items()[1].id, 'release.notes.retry');
+  h.opened.onClose();
   h.page.onClose();
   runtime.flush();
 });

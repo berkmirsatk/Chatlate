@@ -11,7 +11,7 @@ Chat translation for Inugram, with Telegram formatting preserved.
 - Drag providers into your preferred order and enable or disable them individually.
 - Automatically try the next enabled provider when a service is temporarily unavailable.
 - Test enabled providers and see their connection status and response time.
-- Read release notes and version history in the plugin.
+- Read current English release notes and version history from GitHub in the plugin.
 - English and Turkish interface, following Inugram's language by default.
 
 ## Currently supported providers
@@ -50,8 +50,8 @@ npm run package
 
 Source modules remain readable; the build produces one installable `.inu.js` file. See [DEVELOPING.md](DEVELOPING.md), [CHANGELOG.md](CHANGELOG.md) and the [release checklist](docs/RELEASE_CHECKLIST.md).
 
-Chatlate checks this repository's latest public Release when settings opens. Newer versions appear below the banner; installation starts only after a tap and uses Inugram's normal confirmation screen. Checks send no translation text or account token. While the repository is private or has no public Release, no update is offered.
+Chatlate checks this repository's latest public Release when settings opens. Newer versions appear below the banner; installation starts only after a tap and uses Inugram's normal confirmation screen. Checks send no translation text or account token. While the repository is private or has no public Release, no update is offered. Version history and release notes are fetched from `CHANGELOG.md` on `main` whenever opened; the English text is shared with GitHub Releases and the Telegram post. Reading notes requires a connection and a public repository.
 
 ## License
 
-[GNU GPLv3](LICENSE); see [third-party notices](THIRD_PARTY_NOTICES.md) for included marks. © 2026 [real4265726B](https://t.me/real4265726B). Chatlate combines “Chat” and “Translate”.
+[GNU GPLv3](LICENSE); see [third-party notices](THIRD_PARTY_NOTICES.md) for included marks. © 2026 [berkmirsatk](https://t.me/berkmirsatk). Chatlate combines “Chat” and “Translate”.

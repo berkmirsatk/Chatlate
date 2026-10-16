@@ -1,0 +1,41 @@
+name: Sync Telegram changelogs
+on:
+  push:
+    branches: [main]
+    paths:
+      - CHANGELOG.md
+      - .github/telegram/channel-posts.json
+      - .github/telegram/post.rich.md
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: telegram-channel-sync
+  cancel-in-progress: false
+
+jobs:
+  sync:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run notes -- --all --body
+      - run: python3 -m unittest discover -s .github/telegram -p 'test_*.py' -v
+      - name: Edit registered channel announcements
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.PLUMGINS_BOT_TOKEN }}
+        run: python3 .github/telegram/sync.py --notes-dir dist/release-notes

@@ -1,0 +1,48 @@
+name: Telegram private preview
+on: workflow_dispatch
+
+permissions:
+  contents: read
+
+concurrency:
+  group: telegram-private-preview
+  cancel-in-progress: false
+
+jobs:
+  preview:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Read the shared changelog
+        run: npm run notes -- --version 1.0.0 --body --output "$RUNNER_TEMP/chatlate-notes.md"
+      - name: Test the private recipient guard and message payload
+        run: python3 -m unittest discover -s .github/telegram -p 'test_*.py' -v
+      - name: Download the released installation file
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release download v1.0.0 --repo "$GITHUB_REPOSITORY" \
+            --pattern 'Chatlate-1.0.0.inu.js' --pattern 'Chatlate-1.0.0.sha256' \
+            --dir "$RUNNER_TEMP/chatlate-preview"
+      - name: Verify the installation file checksum
+        working-directory: ${{ runner.temp }}/chatlate-preview
+        run: sha256sum -c Chatlate-1.0.0.sha256
+      - name: Send one private preview to the author
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.PLUMGINS_BOT_TOKEN }}
+          TELEGRAM_OWNER_ID: ${{ secrets.PLUMGINS_OWNER_ID }}
+        run: |
+          python3 .github/telegram/preview.py \
+            --installer "$RUNNER_TEMP/chatlate-preview/Chatlate-1.0.0.inu.js" \
+            --notes "$RUNNER_TEMP/chatlate-notes.md"

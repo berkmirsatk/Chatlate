@@ -8,7 +8,6 @@ const fixture = buildSync({
       "export { createUpdates } from './src/updates/index.js'; export { isNewer } from './src/updates/version.js'; export { githubReleaseUrl } from './src/updates/release-link.js';",
     resolveDir: process.cwd(),
   },
-  loader: { '.md': 'text' },
   bundle: true,
   write: false,
   format: 'iife',
@@ -16,6 +15,7 @@ const fixture = buildSync({
 }).outputFiles[0].text;
 
 function harness(source = null, version = '', language = 'en') {
+  if (source) source = { changelog: async () => [latest()], ...source };
   let opened,
     invalidations = 0,
     celebrations = 0;
@@ -31,7 +31,14 @@ function harness(source = null, version = '', language = 'en') {
       openUrl: (url) => urls.push(url),
       utils: { md: (text) => ({ text, entities: [] }) },
       ui: {
-        settingsPage: (p) => ({ ...p, invalidate() {}, dispose() {} }),
+        settingsPage: (p) => ({
+          ...p,
+          invalidations: 0,
+          invalidate() {
+            this.invalidations++;
+          },
+          dispose() {},
+        }),
         button: (p) => p,
         header: (text) => ({ header: text }),
         separator: (text) => ({ text }),
@@ -122,7 +129,7 @@ test('only newer stable releases appear; numeric comparison handles multi-digit 
   }
 });
 
-test('verified release uses background-free formatted notes, localizes notes and installs only after a tap', async () => {
+test('verified release loads current English notes in a localized UI and installs only after a tap', async () => {
   let checks = 0,
     installs = 0;
   const h = harness(
@@ -147,9 +154,10 @@ test('verified release uses background-free formatted notes, localizes notes and
   assert.equal(h.controller.banner().text, '↑  Güncelleme mevcut · 1.0.1');
   h.controller.banner().onClick();
   assert.equal(h.opened.title, 'Güncellemeler');
+  await settle();
   const card = notes(h.opened);
   assert.equal(card.onClick, undefined);
-  assert.equal(card.text.text, latest().notes.tr);
+  assert.equal(card.text.text, latest().notes.en);
   assert.equal(
     h.opened.items().some((item) => item.id === 'release.scenario'),
     false,
@@ -227,43 +235,127 @@ test('closing aborts the install and ignores late checks; failures clear pending
   assert.equal(installSignal.aborted, true);
 });
 
-test('offline history contains the actual installed release, without demo versions or footer links', () => {
-  for (const language of ['en', 'tr']) {
-    const h = harness(null, '', language);
-    const item = h.controller.historyItem();
-    assert.equal(item.text, language === 'tr' ? 'Sürüm geçmişi' : 'Version history');
-    item.onClick();
-    const entries = h.opened.items();
-    assert.equal(entries.length, 1);
-    assert.equal(entries[0].id, 'release.history.1.0.0');
-    assert.equal(entries[0].value, language === 'tr' ? 'Yüklü' : 'Installed');
-    entries[0].onClick();
-    assert.equal(h.opened.title, 'Chatlate 1.0.0');
-    const card = notes(h.opened);
-    assert.equal(card.onClick, undefined);
-    assert.match(card.text.text, language === 'tr' ? /İlk sürüm/ : /First release/);
-    assert.doesNotMatch(card.text.text, /1\.0\.1|Markdown preview|https:\/\//);
-    assert.equal(row(h.opened, 'release.update'), undefined);
-    assert.equal(h.timers.size, 0);
-  }
+test('history and selected notes are fetched on every opening, with no embedded offline archive', async () => {
+  let content = '**Translation**\n- First text',
+    reads = 0;
+  const source = {
+    check: async () => null,
+    install: async () => {},
+    changelog: async () => {
+      reads++;
+      return [{ version: '1.0.0', notes: { en: content } }];
+    },
+  };
+  const h = harness(source, '', 'tr');
+  assert.equal(reads, 0);
+  const item = h.controller.historyItem();
+  assert.equal(item.text, 'Sürüm geçmişi');
+  item.onClick();
+  const history = h.opened;
+  assert.equal(history.items()[0].text, 'Sürüm notları yükleniyor…');
+  await settle();
+  const entry = history.items()[0];
+  assert.equal(entry.id, 'release.history.1.0.0');
+  assert.equal(entry.value, 'Yüklü');
+  content = '**Translation**\n- Corrected text';
+  entry.onClick();
+  await settle();
+  assert.equal(h.opened.title, 'Chatlate 1.0.0');
+  assert.equal(notes(h.opened).text.text, content);
+  assert.equal(reads, 2);
+  assert.equal(row(h.opened, 'release.update'), undefined);
+  h.opened.onClose();
+  content = '**Translation**\n- Another correction';
+  entry.onClick();
+  await settle();
+  assert.equal(notes(h.opened).text.text, content);
+  assert.equal(reads, 3);
+  h.controller.reset();
+  assert.equal(h.timers.size, 0);
+  const previous = h.opened;
+  entry.onClick();
+  assert.equal(h.opened, previous);
 });
 
-test('history includes a newly discovered release while preserving installed offline notes', async () => {
-  const h = harness({ check: async () => latest(), install: async () => {} });
+test('history failures expose Retry and never replace missing online data with bundled notes', async () => {
+  let fail = true;
+  const h = harness({
+    check: async () => null,
+    install: async () => {},
+    changelog: async () => {
+      if (fail) throw Error('offline');
+      return [{ version: '1.0.0', notes: { en: '**Translation**\n- Current notes' } }];
+    },
+  });
+  h.controller.historyItem().onClick();
+  await settle();
+  assert.match(h.opened.items()[0].text, /Could not load/);
+  assert.equal(notes(h.opened), undefined);
+  assert.equal(
+    h.opened.items().some((item) => item.id === 'release.history.1.0.0'),
+    false,
+  );
+  fail = false;
+  row(h.opened, 'release.notes.retry').onClick();
+  await settle();
+  assert.equal(h.opened.items()[0].id, 'release.history.1.0.0');
+  h.controller.reset();
+  assert.equal(h.timers.size, 0);
+});
+
+test('update notes ignore metadata text, retry fresh data and never display stale fallback notes', async () => {
+  let fail = true;
+  const h = harness({
+    check: async () => latest(),
+    install: async () => {},
+    changelog: async () => {
+      if (fail) throw Error('offline');
+      return [{ version: '1.0.1', notes: { en: '**Settings**\n- Fresh canonical text' } }];
+    },
+  });
   h.controller.checkOnce();
   await settle();
-  h.controller.historyItem().onClick();
-  const entries = h.opened.items();
-  assert.deepEqual(
-    Array.from(entries, (entry) => entry.id),
-    ['release.history.1.0.1', 'release.history.1.0.0'],
+  h.controller.banner().onClick();
+  await settle();
+  assert.equal(notes(h.opened), undefined);
+  assert.match(
+    h.opened
+      .items()
+      .find((item) => typeof item.text === 'string' && item.text.includes('Could not load')).text,
+    /connection/,
   );
-  entries[0].onClick();
-  assert.equal(notes(h.opened).text.text, latest().notes.en);
+  fail = false;
+  row(h.opened, 'release.notes.retry').onClick();
+  await settle();
+  assert.equal(notes(h.opened).text.text, '**Settings**\n- Fresh canonical text');
   h.controller.reset();
-  entries[1].onClick();
-  assert.equal(h.opened.title, 'Chatlate 1.0.0');
-  assert.match(notes(h.opened).text.text, /First release/);
+});
+
+test('closing or unloading notes aborts the request and ignores late responses', async () => {
+  for (const reset of [false, true]) {
+    let signal, resolve;
+    const h = harness({
+      check: async () => null,
+      install: async () => {},
+      changelog: (abort) => {
+        signal = abort;
+        return new Promise((done) => {
+          resolve = done;
+        });
+      },
+    });
+    h.controller.historyItem().onClick();
+    const page = h.opened;
+    const count = page.invalidations;
+    if (reset) h.controller.reset();
+    else page.onClose();
+    assert.equal(signal.aborted, true);
+    assert.equal(h.timers.size, 0);
+    resolve([{ version: '1.0.0', notes: { en: 'Late notes' } }]);
+    await settle();
+    assert.equal(page.invalidations, count);
+    assert.equal(notes(page), undefined);
+  }
 });
 
 test('GitHub release action is above Update and opens only the selected release URL', async () => {

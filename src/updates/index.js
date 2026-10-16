@@ -1,9 +1,8 @@
 import { GITHUB_SVG } from '../community-icons.js';
 import { githubReleaseUrl } from './release-link.js';
 import { PLUGIN_VERSION } from '../identity.js';
-import { getLanguage } from '../i18n.js';
 import { get, put } from '../storage.js';
-import { createChangelogText } from './changelog-text.js';
+import { createVersionNotes } from './remote-notes.js';
 import { celebrateUpdate } from './celebration.js';
 import { updateMessages } from './messages.js';
 import { isNewer } from './version.js';
@@ -11,6 +10,7 @@ import { createReleaseHistory } from './history.js';
 
 /** @typedef {{version: string, notes: {en?: string, tr?: string}, url?: string}} Release
  * @typedef {{check(signal: AbortSignal): Promise<Release | null>,
+ * changelog(signal: AbortSignal): Promise<Release[]>,
  * install(release: Release, signal: AbortSignal): Promise<void>}} ReleaseSource */
 
 /** UI and lifecycle for releases supplied by a validating distribution adapter.
@@ -27,7 +27,7 @@ export function createUpdates(invalidate, source = null) {
       githubIcon = inu.icons.common('link');
     } catch {}
   }
-  const history = createReleaseHistory(() => release);
+  const history = createReleaseHistory(source);
   let checked = false,
     checkController,
     installController;
@@ -69,8 +69,7 @@ export function createUpdates(invalidate, source = null) {
     const selected = release;
     const installer = source;
     const text = updateMessages();
-    const notes = selected.notes?.[getLanguage()] || selected.notes?.en || text.missingNotes;
-    const renderer = createChangelogText(inu.utils.md(notes));
+    const notes = createVersionNotes(source, selected.version, () => page.invalidate());
     const releaseUrl = githubReleaseUrl(selected);
     let closed = false,
       busy = false,
@@ -78,7 +77,7 @@ export function createUpdates(invalidate, source = null) {
     function close() {
       closed = true;
       pages.delete(close);
-      renderer.dispose();
+      notes.dispose();
       pageController?.abort();
     }
     async function install() {
@@ -123,7 +122,7 @@ export function createUpdates(invalidate, source = null) {
           onClick: () => {},
         }),
         inu.ui.header('Chatlate ' + selected.version),
-        renderer.item(),
+        ...notes.items(),
         inu.ui.button({
           id: 'release.github',
           text: text.githubRelease,
@@ -147,6 +146,7 @@ export function createUpdates(invalidate, source = null) {
     pages.add(close);
     try {
       inu.ui.openPage(page);
+      notes.load();
     } catch {
       close();
       page.dispose();

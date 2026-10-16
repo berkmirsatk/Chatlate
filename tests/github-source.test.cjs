@@ -105,17 +105,37 @@ function harness(options = {}) {
 }
 const signal = () => new AbortController().signal;
 
-test('release checks select the stable newer version and format headings without installing', async () => {
+test('release checks select the stable newer version without copying potentially stale release notes', async () => {
   const h = harness();
   assert.equal(h.create(null), null);
   assert.throws(() => h.create('../other/repo'), /Invalid repository/);
   const found = await h.create(repository).check(signal());
   assert.equal(found.version, '1.0.1');
   assert.equal(found.url, release().html_url);
-  assert.equal(found.notes.en, '**Added**\n- A feature\n```\n# literal code\n```');
+  assert.equal(found.notes.en, undefined);
   assert.equal(h.requests[0].url, api + '/releases/latest');
   assert.equal(h.requests[0].init.redirect, 'error');
   assert.equal(h.imports.length, 0);
+});
+
+test('changelog reads the current main file every time and uses no new fetch host', async () => {
+  let text = '# Changelog\n## 1.0.0\n### Translation\n- First text';
+  const h = harness({ fetch: async () => ({ status: 200, ok: true, text: async () => text }) });
+  const source = h.create(repository);
+  const first = await source.changelog(signal());
+  assert.equal(first[0].notes.en, '**Translation**\n- First text');
+  text = text.replace('First text', 'Corrected text');
+  const second = await source.changelog(signal());
+  assert.equal(second[0].notes.en, '**Translation**\n- Corrected text');
+  assert.equal(h.requests.length, 2);
+  for (const request of h.requests) {
+    assert.equal(request.url, api + '/contents/CHANGELOG.md?ref=main');
+    assert.equal(request.init.headers.Accept, 'application/vnd.github.raw+json');
+    assert.equal(request.init.headers['Cache-Control'], 'no-cache');
+    assert.equal(request.init.redirect, 'error');
+  }
+  const hidden = harness({ fetch: async () => ({ status: 404 }) });
+  await assert.rejects(hidden.create(repository).changelog(signal()), /unavailable/);
 });
 
 test('private or unpublished repositories are silent; HTTP and oversized metadata fail', async () => {

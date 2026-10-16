@@ -2,20 +2,24 @@
 
 ## 1.0.0
 
-Chat translation for Inugram, with formatting preserved.
+### Translation
 
 - Translate messages and entire chats without Telegram Premium.
-- Preserve bold, italic, spoilers, quotes and links, while keeping code, usernames and custom emoji unchanged.
-- Drag providers to set their priority, and enable or disable them individually.
-- Automatically try the next enabled provider when a translation service is temporarily unavailable.
-- Test all enabled providers and view connection status and timing.
-- Check for new versions from settings and install through Inugram's confirmation screen.
-- Read release notes and version history in the plugin.
-- Access the Plumgins channel, chat group and GitHub repository from the settings banner.
-- Support development through Buy Me a Coffee or USDT on TON with a copyable address.
-- English and Turkish interface, with automatic Inugram language detection.
-- Remember provider preferences, return to Telegram translation when disabled, and restore the chosen provider when enabled.
+- Preserve formatting, links, quotes and spoilers.
+- Keep code, usernames and custom emoji unchanged.
 
-### Currently supported providers
+### Providers
 
-Google · Yandex
+- Drag providers to set their priority and enable or disable them individually.
+- Automatically try the next enabled provider when a service is temporarily unavailable.
+- Test providers and view connection status and response time.
+
+**Currently supported:** Google · Yandex
+
+### Settings
+
+- Check for updates and browse release history.
+- English and Turkish interface, following Inugram’s language by default.
+- Keep provider preferences across restarts.
+- Return to Telegram translation when disabled and restore the selected provider when enabled.
+- Access community links and support options from the settings banner.

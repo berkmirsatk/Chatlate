@@ -1,0 +1,41 @@
+name: Sync release notes
+on:
+  push:
+    branches: [main]
+    paths: [CHANGELOG.md]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run notes -- --all
+      - name: Update notes for existing Releases
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          for notes in dist/release-notes/*.md; do
+            tag=$(basename "$notes" .md)
+            if gh release view "$tag" > /dev/null 2> /tmp/chatlate-release-error; then
+              gh release edit "$tag" --notes-file "$notes"
+            elif grep -Eq 'release not found|HTTP 404' /tmp/chatlate-release-error; then
+              printf 'No Release yet for %s; leaving it unpublished.\n' "$tag"
+            else
+              cat /tmp/chatlate-release-error >&2
+              exit 1
+            fi
+          done

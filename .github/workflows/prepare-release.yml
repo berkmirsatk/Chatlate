@@ -27,10 +27,10 @@ jobs:
           CHATLATE_TAG="v$CHATLATE_VERSION"
           if gh release view "$CHATLATE_TAG" --json isDraft > /tmp/chatlate-release.json; then
             node -e "if (!require('/tmp/chatlate-release.json').isDraft) throw Error('Release is already published')"
-            gh release edit "$CHATLATE_TAG" --target "$GITHUB_SHA" --notes-file RELEASE_NOTES.en.md
+            gh release edit "$CHATLATE_TAG" --target "$GITHUB_SHA" --notes-file dist/release-notes.md
           else
             gh release create "$CHATLATE_TAG" --draft --target "$GITHUB_SHA" \
-              --title "Chatlate $CHATLATE_TAG" --notes-file RELEASE_NOTES.en.md
+              --title "Chatlate $CHATLATE_TAG" --notes-file dist/release-notes.md
           fi
           gh release upload "$CHATLATE_TAG" \
             "dist/Chatlate-$CHATLATE_VERSION.inu.js" \

@@ -1126,7 +1126,7 @@ test('selected description survives hook disposal without changing another plugi
   const makeManifest = (id) =>
     new Manifest(
       'Chatlate',
-      '@real4265726B',
+      '@berkmirsatk',
       id,
       '1.8.31',
       'Original',

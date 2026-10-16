@@ -9,14 +9,14 @@ export default defineConfig({
     minifyWhitespace: false,
     minifyIdentifiers: false,
     minifySyntax: false,
-    loader: { ...options.loader, '.md': 'text', '.svg': 'text' },
+    loader: { ...options.loader, '.svg': 'text' },
   }),
   plugins: {
     chatlate: {
       entry: 'src/index.js',
       manifest: {
         name: 'Chatlate',
-        author: '@real4265726B',
+        author: '@berkmirsatk',
         id: PLUGIN_ID,
         version: PLUGIN_VERSION,
         description: PLUGIN_DESCRIPTIONS,

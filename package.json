@@ -1,7 +1,7 @@
 {
   "name": "chatlate",
   "version": "1.0.0",
-  "author": "@real4265726B",
+  "author": "@berkmirsatk",
   "description": "Chat translation for Inugram with formatting preserved.",
   "scripts": {
     "check": "tsc --noEmit && inu check --no-typecheck",
@@ -11,12 +11,14 @@
     "format:check": "prettier --check src scripts tests inu.config.ts",
     "verify": "npm run format:check && npm run check && npm run build && npm test",
     "package": "node scripts/package.cjs",
-    "embed:banner": "node scripts/embed-banner.cjs"
+    "embed:banner": "node scripts/embed-banner.cjs",
+    "notes": "esbuild scripts/release-notes.js --bundle --platform=node --format=cjs --outfile=dist/release-notes.cjs && node dist/release-notes.cjs"
   },
   "type": "commonjs",
   "devDependencies": {
     "@inugram/cli": "44.0.0",
     "@inugram/plugin-types": "44.0.0",
+    "esbuild": "0.25.12",
     "prettier": "3.6.2",
     "typescript": "7.0.2"
   },
