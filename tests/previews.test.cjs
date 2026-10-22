@@ -219,8 +219,7 @@ test('SDK previews scroll only when narrow, stop when wide, and never change ano
   };
   const h = harness({}, undefined, 'en', runtime.native);
   h.page.items();
-  runtime.flush();
-  await new Promise((resolve) => setTimeout(resolve, 5));
+  await runtime.ready();
   const banner = h.page.items()[0].native;
   assert.equal(hooks.size, 3);
   const row = (value) => ({ getField: (key) => (key === 'textValue' ? value : null) });

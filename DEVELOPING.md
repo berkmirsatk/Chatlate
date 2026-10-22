@@ -41,7 +41,9 @@ Add its base code, display name and flag ID to `language-catalog.js`, a full tra
 
 ## Artwork and support
 
-The static 2:1 banner is `assets/chatlate-settings-poster.webp`. Run `npm run embed:banner` after changing it. Current branding exports stay in `assets/`; keep design experiments out of the repository.
+The static 2:1 banner is `assets/chatlate-settings-poster.webp`. The SDK bundles it directly; rebuild after changing it. Current branding exports stay in `assets/`; keep design experiments out of the repository.
+
+The CLI and API types are pinned to SDK 49. The banner is a lazy `File` asset in the installer's footer, outside executable JavaScript. Its bytes are read when settings needs the image; closing settings discards pending reads and releases the native image. Inugram v13.0.3-49 or later is required.
 
 Community destinations are defined in `community-links.js`. Channel/group photos are resolved only while expanded and refreshed from the active account's public peer cache. The GitHub menu uses `distribution.js` when configured and otherwise opens the author profile. `community-icons.js` contains fixed local marks.
 

@@ -1,6 +1,7 @@
 const fs = require('node:fs');
 const vm = require('node:vm');
 const assert = require('node:assert/strict');
+const { bundledAssets } = require('./bundled-assets.cjs');
 const code = fs.readFileSync(process.env.PLUGIN_FILE || 'dist/chatlate.inu.js', 'utf8');
 function harness(
   values = {},
@@ -41,6 +42,7 @@ function harness(
   };
   vm.runInNewContext(code, {
     inu: {
+      assets: bundledAssets(code),
       ...native,
       ui,
       info: () => ({ language: appLanguage }),

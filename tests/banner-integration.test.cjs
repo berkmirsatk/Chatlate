@@ -2,6 +2,59 @@ const assert = require('node:assert/strict');
 const { test } = require('node:test');
 const { harness, ok } = require('./helpers/plugin-runtime.cjs');
 const { bannerRuntime } = require('./helpers/native-runtime.cjs');
+const { bundledAssets } = require('./helpers/bundled-assets.cjs');
+
+test('delayed asset reads cannot rebuild a closed banner or replace a newer settings session', async () => {
+  const runtime = bannerRuntime();
+  const assets = bundledAssets();
+  const reads = [];
+  let file;
+  runtime.native.assets = {
+    get(name) {
+      file = assets.get(name);
+      return {
+        bytes: () => new Promise((resolve, reject) => reads.push({ resolve, reject })),
+      };
+    },
+  };
+  const h = harness({}, undefined, 'en', runtime.native);
+  assert.equal(reads.length, 0, 'importing the asset does not read the image');
+  h.page.items();
+  assert.equal(reads.length, 1);
+  h.page.onClose();
+  h.page.items();
+  assert.equal(reads.length, 2);
+  reads[0].resolve(await file.bytes());
+  await runtime.ready();
+  assert.equal(runtime.decodedBanners.length, 0);
+  reads[1].resolve(await file.bytes());
+  await runtime.ready();
+  assert.equal(runtime.decodedBanners.length, 1);
+  assert.ok(h.page.items().some((row) => row.native?.values.setImportantForAccessibility === 1));
+  h.page.onClose();
+  runtime.flush();
+});
+
+test('an asset read failure restores settings controls and invalidates without retrying on every render', async () => {
+  const runtime = bannerRuntime();
+  let reads = 0;
+  runtime.native.assets = {
+    get: () => ({
+      bytes: async () => {
+        reads++;
+        throw Error('Asset unavailable');
+      },
+    }),
+  };
+  const h = harness({}, undefined, 'en', runtime.native);
+  h.page.items();
+  await runtime.ready();
+  assert.ok(h.page.items().some((row) => row.id === 'test'));
+  assert.ok(h.page.invalidations > 0);
+  assert.equal(reads, 1);
+  h.page.onClose();
+  runtime.flush();
+});
 
 test('static settings banner preserves its aspect ratio and schedules no animation timers', async () => {
   const runtime = bannerRuntime();
@@ -13,8 +66,7 @@ test('static settings banner preserves its aspect ratio and schedules no animati
     },
   });
   h.page.items();
-  runtime.flush();
-  await new Promise((resolve) => setTimeout(resolve, 5));
+  await runtime.ready();
   const header = h.page
     .items()
     .find((row) => row.native?.values.setImportantForAccessibility === 1).native;
@@ -43,11 +95,9 @@ test('closing settings discards queued banner creation and permits a fresh reope
     h = harness({}, undefined, 'en', runtime.native);
   h.page.items();
   h.page.onClose();
-  runtime.flush();
-  await new Promise((resolve) => setTimeout(resolve, 5));
+  await runtime.ready();
   h.page.items();
-  runtime.flush();
-  await new Promise((resolve) => setTimeout(resolve, 5));
+  await runtime.ready();
   assert.equal(
     h.page.items().filter((row) => row.native?.values.setImportantForAccessibility === 1).length,
     1,
@@ -60,8 +110,7 @@ test('static banner is reused while open and releases its image on close/unload'
   const runtime = bannerRuntime(),
     h = harness({}, undefined, 'en', runtime.native);
   h.page.items();
-  runtime.flush();
-  await new Promise((resolve) => setTimeout(resolve, 5));
+  await runtime.ready();
   const header = h.page
     .items()
     .find((row) => row.native?.values.setImportantForAccessibility === 1).native;
@@ -74,8 +123,7 @@ test('static banner is reused while open and releases its image on close/unload'
   runtime.flush();
   assert.equal(image.values.setImageDrawable, null);
   h.page.items();
-  runtime.flush();
-  await new Promise((resolve) => setTimeout(resolve, 5));
+  await runtime.ready();
   const reopened = h.page
     .items()
     .find((row) => row.native?.values.setImportantForAccessibility === 1).native;
@@ -100,8 +148,7 @@ test('failed banner decoding leaves settings usable without repeated decode atte
       : original(name);
   const h = harness({}, undefined, 'en', runtime.native);
   h.page.items();
-  runtime.flush();
-  await new Promise((resolve) => setTimeout(resolve, 5));
+  await runtime.ready();
   assert.equal(
     h.page.items().some((row) => row.native?.values.setImportantForAccessibility === 1),
     false,
