@@ -214,7 +214,7 @@ export function createSettingsBanner(invalidate, onToggle) {
   }
   return {
     reset,
-    isPending: () => pending,
+    isUnavailable: () => disabled,
     getView: () => root,
     /** @param {boolean} nextExpanded
      * @param {{available: boolean, text: string, onClick: () => void}} update

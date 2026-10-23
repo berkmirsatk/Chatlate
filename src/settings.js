@@ -203,12 +203,9 @@ export function registerSettings(providers, refreshDescription) {
       ];
       updates.checkOnce();
       const banner = settingsBanner.render(linksExpanded, updates.banner());
-      // Publish the first rows together so an asynchronously inserted banner
-      // cannot animate over the temporary language/provider section.
-      if (!banner && settingsBanner.isPending()) return [];
       previews.watch(settingsBanner.getView(), t('donate'), linksExpanded);
       const communityRows =
-        linksExpanded || !banner
+        linksExpanded || settingsBanner.isUnavailable()
           ? [...communityLinks.items(), updates.historyItem(), donation.item()]
           : [];
       rows.unshift(...(banner ? [banner] : []), ...communityRows, inu.ui.separator());

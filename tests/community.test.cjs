@@ -340,11 +340,10 @@ test('closing settings cancels queued expansion and reopening starts collapsed',
   runtime.flush();
 });
 
-test('first settings render waits for the banner and publishes the complete list together', async () => {
+test('settings controls remain available while the banner loads', async () => {
   const runtime = bannerRuntime(),
     h = harness({}, undefined, 'en', runtime.native);
-  assert.deepEqual(Array.from(h.page.items()), []);
-  assert.deepEqual(Array.from(h.page.items()), []);
+  assert.ok(h.page.items().some((row) => row.id === 'test'));
   await runtime.ready();
   const rows = h.page.items(),
     header = rows[0].native;
@@ -353,7 +352,7 @@ test('first settings render waits for the banner and publishes the complete list
   assert.equal(h.page.items()[0].native, header);
   h.page.onClose();
   runtime.flush();
-  assert.deepEqual(Array.from(h.page.items()), []);
+  assert.ok(h.page.items().some((row) => row.id === 'test'));
   await runtime.ready();
   assert.equal(h.page.items()[0].native.values.setContentDescription, 'Chatlate');
   h.page.onClose();

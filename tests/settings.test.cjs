@@ -763,7 +763,7 @@ test('timing out a service still tests the next enabled provider', async () => {
     .items()
     .find((row) => row.id === 'test')
     .onClick();
-  await new Promise((resolve) => setTimeout(resolve, 240));
+  await waitUntil(() => h.page.items().find((row) => row.id === 'test').text === 'Test connection');
   assert.deepEqual(calls, ['Google', 'Yandex']);
   const rows = h.page.items();
   assert.ok(rows.some((row) => /^Google:/.test(row.text)));
