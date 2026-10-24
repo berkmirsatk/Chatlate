@@ -1,9 +1,10 @@
 const assert = require('node:assert/strict');
 const vm = require('node:vm');
-const { buildSync } = require('esbuild');
+const { build } = require('esbuild');
+const { readFileSync } = require('node:fs');
 const { test } = require('node:test');
 
-const source = buildSync({
+const source = build({
   stdin: {
     contents: "export { createSettingsBanner } from './src/settings-banner.js';",
     resolveDir: process.cwd(),
@@ -13,9 +14,20 @@ const source = buildSync({
   format: 'iife',
   globalName: 'Banner',
   minifyWhitespace: true,
-}).outputFiles[0].text;
+  plugins: [
+    {
+      name: 'banner-asset-fixture',
+      setup(build) {
+        build.onLoad({ filter: /\.webp$/ }, () => ({
+          contents: "export default inu.assets.get('poster.webp');",
+          loader: 'js',
+        }));
+      },
+    },
+  ],
+}).then((result) => result.outputFiles[0].text);
 
-test('banner strip has its own click, keeps artwork size, follows state and cancels stale actions', () => {
+test('banner strip has its own click, keeps artwork size, follows state and cancels stale actions', async () => {
   const ui = [],
     callbacks = [];
   const animations = [];
@@ -44,6 +56,9 @@ test('banner strip has its own click, keeps artwork size, follows state and canc
   }
   const context = {
     inu: {
+      assets: {
+        get: () => ({ bytes: async () => readFileSync('assets/chatlate-settings-poster.webp') }),
+      },
       jvm: {
         runnable: (fn) => fn,
         defineClass: (spec) =>
@@ -75,7 +90,6 @@ test('banner strip has its own click, keeps artwork size, follows state and canc
           if (name.endsWith('ApplicationLoader')) return { getStaticField: () => new View() };
           if (name.endsWith('Theme'))
             return { getStaticField: (key) => key, callStatic: (_, key) => key };
-          if (name.endsWith('Base64')) return { callStatic: () => new Uint8Array() };
           if (name.endsWith('BitmapFactory') || name.endsWith('Bitmap'))
             return { callStatic: () => ({ bitmap: true }) };
           if (name.endsWith('$Config') || name.endsWith('$ScaleType') || name.endsWith('$Style'))
@@ -87,7 +101,7 @@ test('banner strip has its own click, keeps artwork size, follows state and canc
     },
     setTimeout: (fn) => callbacks.push(fn),
   };
-  vm.runInNewContext(source, context);
+  vm.runInNewContext(await source, context);
   const banner = context.Banner.createSettingsBanner(
     () => {},
     () => toggles++,
@@ -104,6 +118,7 @@ test('banner strip has its own click, keeps artwork size, follows state and canc
     listener.spec.methods.onClick.body(listener, view);
   };
   banner.render(false, state);
+  await new Promise((resolve) => setImmediate(resolve));
   flushUi();
   flushCallbacks();
   const root = banner.getView(),

@@ -11,6 +11,11 @@ function bannerRuntime() {
   const runtime = dragRuntime();
   const original = runtime.native.jvm.cls;
   runtime.decodedBanners = [];
+  runtime.ready = async () => {
+    await new Promise((resolve) => setImmediate(resolve));
+    runtime.flush();
+    await new Promise((resolve) => setTimeout(resolve, 5));
+  };
   runtime.native.jvm.cls = (name) => {
     if (name === 'org.telegram.ui.Components.ItemOptions')
       return {
@@ -25,13 +30,6 @@ function bannerRuntime() {
           };
           runtime.menus.push(menu);
           return menu;
-        },
-      };
-    if (name === 'android.util.Base64')
-      return {
-        callStatic: (method, data) => {
-          assert.equal(method, 'decode');
-          return Buffer.from(data, 'base64');
         },
       };
     if (name === 'android.graphics.BitmapFactory')
@@ -61,7 +59,7 @@ function dragRuntime(
   languageFlags = false,
   attachedSelector = false,
 ) {
-  let value = 'drag-installation:multi.google-free',
+  let value = 'drag-installation:chatlate.google',
     onUi = false,
     definitions = 0;
   const queue = [],

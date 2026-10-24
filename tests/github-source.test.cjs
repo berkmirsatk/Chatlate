@@ -93,7 +93,13 @@ function harness(options = {}) {
             };
           if (name.endsWith('PluginImportHelper'))
             return {
-              getStaticField: () => ({ call: (...args) => imports.push(args) }),
+              getStaticField: () => ({
+                call: (...args) => {
+                  if (options.legacyImport && args.length !== 3) throw TypeError('No overload');
+                  if (!options.legacyImport && args.length !== 4) throw TypeError('No overload');
+                  imports.push(args);
+                },
+              }),
             };
           throw Error('Unexpected native access: ' + name);
         },
@@ -187,7 +193,10 @@ test('installation rechecks the selected tag and uses the native permission shee
     [api + '/releases/tags/v1.0.1', api + '/releases/assets/42'],
   );
   assert.equal(h.requests[1].init.headers.Accept, 'application/octet-stream');
-  assert.deepEqual(h.imports, [['startImport', 'fragment', source.toString()]]);
+  assert.deepEqual(h.imports, [['startImport', 'fragment', source.toString(), null]]);
+  const legacy = harness({ legacyImport: true });
+  await legacy.create(repository).install({ version: '1.0.1' }, signal());
+  assert.deepEqual(legacy.imports, [['startImport', 'fragment', source.toString()]]);
 });
 
 test('mismatched bytes, plugin identity, final host or missing page never reach native import', async () => {

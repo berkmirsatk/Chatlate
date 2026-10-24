@@ -27,7 +27,7 @@ These use unofficial public endpoints. Availability and rate limits may change.
 3. Enable Chatlate and review its permissions.
 4. Enable chat translation in Inugram. Google is selected automatically; change priorities in Chatlate settings.
 
-Use an Inugram version that supports plugins, custom translation providers and the native bridge. Whole-chat translation follows the app's excluded-language and chat eligibility settings. Update an existing installation without uninstalling it to keep preferences.
+Requires Inugram v13.0.3-49 or later with plugin support. Whole-chat translation follows the app's excluded-language and chat eligibility settings. Update an existing installation without uninstalling it to keep preferences.
 
 ## Privacy
 

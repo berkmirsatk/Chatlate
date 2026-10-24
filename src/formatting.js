@@ -1,4 +1,5 @@
 import { t } from './i18n.js';
+import { InvalidResponseError } from './http.js';
 const protectedTypes = new Set([
   'messageEntityCode',
   'messageEntityPre',
@@ -101,6 +102,6 @@ export function validate(result, count) {
     ) ||
     result.reduce((size, text) => size + text.length, 0) > 100000
   )
-    throw new Error(t('invalidResponse'));
+    throw new InvalidResponseError('invalidResponse');
   return result;
 }

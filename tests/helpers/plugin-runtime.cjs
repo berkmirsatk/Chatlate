@@ -1,6 +1,7 @@
 const fs = require('node:fs');
 const vm = require('node:vm');
 const assert = require('node:assert/strict');
+const { bundledAssets } = require('./bundled-assets.cjs');
 const code = fs.readFileSync(process.env.PLUGIN_FILE || 'dist/chatlate.inu.js', 'utf8');
 function harness(
   values = {},
@@ -12,7 +13,7 @@ function harness(
   timers = {},
 ) {
   const registered = new Map(),
-    storage = new Map(Object.entries(values).map(([k, v]) => ['multi-translate.' + k, v]));
+    storage = new Map(Object.entries(values).map(([k, v]) => ['chatlate.' + k, v]));
   let page, opened;
   const ui = {
     ...native.ui,
@@ -41,6 +42,7 @@ function harness(
   };
   vm.runInNewContext(code, {
     inu: {
+      assets: bundledAssets(code),
       ...native,
       ui,
       info: () => ({ language: appLanguage }),
@@ -126,13 +128,15 @@ async function waitUntil(predicate) {
   }
 }
 const ok = (data) => ({ ok: true, json: async () => data });
+/** Google receives its source text in the form body. */
+const googleText = (options) => new URLSearchParams(options?.body ?? '').get('q');
 const run = (h, texts, signal = new AbortController().signal) =>
   h.registered
-    .get('multi.google-free')
+    .get('chatlate.google')
     .translate({ texts, to: 'tr', from: texts.map(() => 'en'), signal });
 function replyWith(translations, inspect = () => {}) {
   return async (url, options) => {
-    const q = new URL(url).searchParams.get('q');
+    const q = googleText(options);
     inspect(url, options, q);
     let index = 0;
     const result = /⟦\d+:0⟧/.test(q)
@@ -147,9 +151,10 @@ function replyWith(translations, inspect = () => {}) {
 }
 
 const runWith = (h, id, texts, to = 'tr', signal = new AbortController().signal) =>
-  h.registered.get('multi.' + id).translate({ texts, to, from: texts.map(() => 'en'), signal });
+  h.registered.get('chatlate.' + id).translate({ texts, to, from: texts.map(() => 'en'), signal });
 
 module.exports = {
+  googleText,
   fs,
   vm,
   assert,

@@ -5,7 +5,7 @@ const { bannerRuntime, dragRuntime, nativeOrderPage } = require('./helpers/nativ
 
 test('order summary delegates overflow scrolling to Android and expands the provider editor', async () => {
   const runtime = dragRuntime(true, true),
-    h = harness({ fallback: 'yandex-free' }, undefined, 'en', runtime.native);
+    h = harness({ fallback: '["google","yandex"]' }, undefined, 'en', runtime.native);
   h.page.items();
   runtime.flush();
   await new Promise((resolve) => setTimeout(resolve, 5));
@@ -98,7 +98,7 @@ test('order summary delegates overflow scrolling to Android and expands the prov
 
 test('contained dragging clamps boxes to the list boundary and cancels without detaching them', async () => {
   const runtime = dragRuntime(),
-    h = harness({ fallback: 'yandex-free' }, undefined, 'en', runtime.native);
+    h = harness({ fallback: '["google","yandex"]' }, undefined, 'en', runtime.native);
   const { page, root } = await nativeOrderPage(h, runtime);
   const original = [...root.children];
   runtime.drag(root, 1);
@@ -112,7 +112,7 @@ test('contained dragging clamps boxes to the list boundary and cancels without d
   runtime.event(root, 4, -10000);
   for (const [index, box] of root.children.entries())
     assert.equal(box.values.setTranslationY, index * 56);
-  assert.equal(runtime.value, 'drag-installation:multi.google-free');
+  assert.equal(runtime.value, 'drag-installation:chatlate.google');
   page.onClose();
   runtime.flush();
 });
@@ -219,8 +219,7 @@ test('SDK previews scroll only when narrow, stop when wide, and never change ano
   };
   const h = harness({}, undefined, 'en', runtime.native);
   h.page.items();
-  runtime.flush();
-  await new Promise((resolve) => setTimeout(resolve, 5));
+  await runtime.ready();
   const banner = h.page.items()[0].native;
   assert.equal(hooks.size, 3);
   const row = (value) => ({ getField: (key) => (key === 'textValue' ? value : null) });

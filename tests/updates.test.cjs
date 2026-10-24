@@ -19,7 +19,7 @@ function harness(source = null, version = '', language = 'en') {
   let opened,
     invalidations = 0,
     celebrations = 0;
-  const storage = new Map([['multi-translate.update.pendingVersion', version]]);
+  const storage = new Map([['chatlate.update.pendingVersion', version]]);
   const timers = new Map(),
     native = [],
     toasts = [],
@@ -167,7 +167,7 @@ test('verified release loads current release notes in a localized UI and install
   await settle();
   assert.equal(installs, 1);
   assert.equal(h.celebrations, 0);
-  assert.equal(h.storage.get('multi-translate.update.pendingVersion'), '1.0.1');
+  assert.equal(h.storage.get('chatlate.update.pendingVersion'), '1.0.1');
 });
 
 test('completion is confirmed by the successor version, once, and skips closed settings', () => {
@@ -177,7 +177,7 @@ test('completion is confirmed by the successor version, once, and skips closed s
   h.flushNative();
   assert.equal(h.celebrations, 1);
   assert.equal(h.toasts.length, 1);
-  assert.equal(h.storage.get('multi-translate.update.pendingVersion'), '');
+  assert.equal(h.storage.get('chatlate.update.pendingVersion'), '');
   const stale = harness(null, '1.0.1');
   stale.controller.checkOnce();
   stale.flushNative();
@@ -218,7 +218,7 @@ test('closing aborts the install and ignores late checks; failures clear pending
   failing.controller.banner().onClick();
   row(failing.opened, 'release.update').onClick();
   await settle();
-  assert.equal(failing.storage.get('multi-translate.update.pendingVersion'), '');
+  assert.equal(failing.storage.get('chatlate.update.pendingVersion'), '');
   assert.equal(failing.toasts.length, 1);
   let installSignal;
   const closing = harness({

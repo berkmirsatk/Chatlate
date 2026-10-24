@@ -10,15 +10,14 @@ const {
   runWith,
 } = require('./helpers/plugin-runtime.cjs');
 
-test('backup provider defaults off and opt-in persists across upgrades', async () => {
+test('backup provider defaults off and opt-in persists after reload', async () => {
   const h = harness({}, async () => ({ ok: false, status: 429 }));
   assert.equal(summaryValue(h), '1. Google');
   await assert.rejects(run(h, [{ text: 'Hello' }]), /429/);
   orderAction(h, 'Add: Yandex');
-  assert.equal(h.storage.get('multi-translate.fallback'), '["google-free","yandex-free"]');
-  const upgraded = harness({ fallback: '1', 'settings-version': '4' });
+  assert.equal(h.storage.get('chatlate.fallback'), '["google","yandex"]');
+  const upgraded = harness({ fallback: h.storage.get('chatlate.fallback') });
   assert.equal(summaryValue(upgraded), '1. Google → 2. Yandex');
-  assert.equal(upgraded.storage.get('multi-translate.fallback'), '["google-free","yandex-free"]');
   assert.ok(
     upgraded.page
       .items()
@@ -31,7 +30,7 @@ test('backup provider defaults off and opt-in persists across upgrades', async (
 
 test('quota fallback retries all fragments on Yandex and preserves nested entities and code', async () => {
   const calls = [];
-  const h = harness({ fallback: '1' }, async (url, options) => {
+  const h = harness({ fallback: '["google","yandex"]' }, async (url, options) => {
     calls.push(new URL(url).hostname);
     if (url.includes('googleapis')) return { ok: false, status: 429 };
     const parts = new URLSearchParams(options.body).getAll('text');
@@ -60,10 +59,10 @@ test('quota fallback retries all fragments on Yandex and preserves nested entiti
   assert.equal(calls.length, 2);
 });
 
-test('network and temporary HTTP errors use backup; authorization and invalid responses do not', async () => {
+test('network, temporary HTTP errors and invalid responses use backup; authorization does not', async () => {
   for (const failure of ['network', 408, 503, 403, 'invalid']) {
     let backupCalls = 0;
-    const h = harness({ fallback: '1' }, async (url) => {
+    const h = harness({ fallback: '["google","yandex"]' }, async (url) => {
       if (url.includes('yandex')) {
         backupCalls++;
         return ok({ code: 200, text: ['Merhaba'] });
@@ -78,28 +77,28 @@ test('network and temporary HTTP errors use backup; authorization and invalid re
         };
       return { ok: false, status: failure };
     });
-    if (['network', 408, 503].includes(failure))
-      assert.equal((await run(h, [{ text: 'Hello' }]))[0].text, 'Merhaba');
+    const recovers = ['network', 408, 503, 'invalid'].includes(failure);
+    if (recovers) assert.equal((await run(h, [{ text: 'Hello' }]))[0].text, 'Merhaba');
     else await assert.rejects(run(h, [{ text: 'Hello' }]));
-    assert.equal(backupCalls, ['network', 408, 503].includes(failure) ? 1 : 0);
+    assert.equal(backupCalls, recovers ? 1 : 0);
   }
 });
 
 test('Yandex quota falls back to Google without changing the selected provider', async () => {
   const calls = [];
-  const h = harness({ fallback: '1', provider: 'yandex-free' }, async (url) => {
+  const h = harness({ fallback: '["google","yandex"]', provider: 'yandex' }, async (url) => {
     calls.push(new URL(url).hostname);
     if (url.includes('yandex')) return { ok: false, status: 429 };
     return ok([[['Merhaba']]]);
   });
-  assert.equal((await runWith(h, 'yandex-free', [{ text: 'Hello' }]))[0].text, 'Merhaba');
+  assert.equal((await runWith(h, 'yandex', [{ text: 'Hello' }]))[0].text, 'Merhaba');
   assert.deepEqual(calls, ['translate.yandex.net', 'translate.googleapis.com']);
-  assert.equal(h.storage.get('multi-translate.provider'), 'yandex-free');
+  assert.equal(h.storage.get('chatlate.provider'), 'yandex');
 });
 
 test('both providers failing terminates after one attempt per service', async () => {
   let calls = 0;
-  const h = harness({ fallback: '1' }, async () => {
+  const h = harness({ fallback: '["google","yandex"]' }, async () => {
     calls++;
     return { ok: false, status: 503 };
   });
@@ -111,7 +110,7 @@ test('cancelled translation never starts a backup request', async () => {
   let started;
   const began = new Promise((resolve) => (started = resolve));
   let calls = 0;
-  const h = harness({ fallback: '1' }, async (url, options) => {
+  const h = harness({ fallback: '["google","yandex"]' }, async (url, options) => {
     calls++;
     started();
     return new Promise((resolve, reject) =>
@@ -130,7 +129,7 @@ test('cancelled translation never starts a backup request', async () => {
 test('primary attempt timeout leaves time for backup within the host budget', async () => {
   const calls = [];
   const h = harness(
-    { fallback: '1' },
+    { fallback: '["google","yandex"]' },
     async (url, options) => {
       calls.push(new URL(url).hostname);
       if (url.includes('yandex')) return ok({ code: 200, text: ['Merhaba'] });
@@ -148,7 +147,7 @@ test('primary attempt timeout leaves time for backup within the host budget', as
 
 test('connection test checks each enabled service directly after a failed primary', async () => {
   const calls = [];
-  const h = harness({ fallback: '1', language: 'tr' }, async (url) => {
+  const h = harness({ fallback: '["google","yandex"]', language: 'tr' }, async (url) => {
     calls.push(url.includes('yandex') ? 'Yandex' : 'Google');
     return url.includes('yandex')
       ? ok({ code: 200, text: ['Merhaba'] })
@@ -170,21 +169,23 @@ test('connection test checks each enabled service directly after a failed primar
   assert.equal(rows.find((row) => row.id === 'test').text, 'Bağlantıyı test et');
 });
 
-test('invalid formatting and changed Google separators never trigger backup', async () => {
-  let calls = 0;
-  const h = harness({ fallback: '1' }, async () => {
-    calls++;
+test('invalid formatting never triggers backup; changed Google separators do', async () => {
+  const hosts = [];
+  const h = harness({ fallback: '["google","yandex"]' }, async (url, options) => {
+    hosts.push(new URL(url).hostname);
+    if (url.includes('yandex'))
+      return ok({ code: 200, text: new URLSearchParams(options.body).getAll('text') });
     return ok([[['broken separators']]]);
   });
   await assert.rejects(
     run(h, [{ text: 'Hello', entities: [{ _: 'messageEntityBold', offset: 0, length: 99 }] }]),
   );
-  assert.equal(calls, 0);
-  await assert.rejects(
-    run(h, [{ text: 'Hello world', entities: [{ _: 'messageEntityBold', offset: 0, length: 5 }] }]),
-    /separators/,
-  );
-  assert.equal(calls, 1);
+  assert.equal(hosts.length, 0);
+  const [result] = await run(h, [
+    { text: 'Hello world', entities: [{ _: 'messageEntityBold', offset: 0, length: 5 }] },
+  ]);
+  assert.equal(result.text, 'Hello world');
+  assert.deepEqual(hosts, ['translate.googleapis.com', 'translate.yandex.net']);
 });
 
 test('one timed-out fallback subscriber does not abort another shared primary request', async () => {
@@ -195,7 +196,7 @@ test('one timed-out fallback subscriber does not abort another shared primary re
     gate = new Promise((resolve) => (release = resolve));
   let calls = 0;
   const h = harness(
-    { fallback: '1' },
+    { fallback: '["google","yandex"]' },
     async (url, options) => {
       calls++;
       if (url.includes('yandex')) return ok({ code: 200, text: ['Yedek'] });

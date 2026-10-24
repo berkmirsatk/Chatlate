@@ -32,10 +32,19 @@ export function createTranslator(provider) {
       const parts = missing.flatMap((i) =>
         plans[i].pieces.filter((piece) => piece.translate).map((piece) => piece.body),
       );
+      // Fragments inherit their message's detected language, so batches never mix languages.
+      const sources = missing.flatMap((i) =>
+        plans[i].pieces
+          .filter((piece) => piece.translate)
+          .map(() => (typeof request.from?.[i] === 'string' ? request.from[i] : null)),
+      );
       // The host enforces a 30-second budget; bound payload size and queue pressure.
       if (parts.length > 100 || parts.join('').length > 18000) throw new Error(t('tooLarge'));
       const translated = parts.length
-        ? validate(await provider.translateParts(parts, request.to, request.signal), parts.length)
+        ? validate(
+            await provider.translateParts(parts, request.to, request.signal, sources),
+            parts.length,
+          )
         : [];
       if (request.signal.aborted) throw new Error(t('cancelled'));
       let offset = 0;

@@ -1,11 +1,18 @@
 import { createQueuedProvider } from './queued.js';
-import { request, HttpError } from '../http.js';
-import { t } from '../i18n.js';
+import { request, HttpError, InvalidResponseError } from '../http.js';
+
+/** Yandex accepts base codes for regional Chinese and modern codes for legacy aliases.
+ * @param {string} language */
+function yandexLanguage(language) {
+  const code = language.toLowerCase();
+  if (code === 'zh' || code.startsWith('zh-') || code.startsWith('zh_')) return 'zh';
+  return { iw: 'he', jw: 'jv', in: 'id', ji: 'yi' }[code] ?? language;
+}
 
 /** @returns {import('../provider.js').Provider} */
 export function createYandexProvider() {
   return createQueuedProvider({
-    id: 'yandex-free',
+    id: 'yandex',
     name: 'Yandex',
     async fetchParts(texts, to, signal) {
       // The public Android translation endpoint accepts repeated text fields.
@@ -16,7 +23,7 @@ export function createYandexProvider() {
         'https://translate.yandex.net/api/v1/tr.json/translate?id=' +
         id +
         '-0-0&srv=android&lang=' +
-        encodeURIComponent(to);
+        encodeURIComponent(yandexLanguage(to));
       const body = texts.map((text) => 'text=' + encodeURIComponent(text)).join('&');
       const data = await request(
         url,
@@ -26,7 +33,7 @@ export function createYandexProvider() {
       );
       if (data?.code !== 200) {
         if (Number.isInteger(data?.code)) throw new HttpError(data.code, '');
-        throw new Error(t('invalidBatch'));
+        throw new InvalidResponseError();
       }
       return data.text;
     },

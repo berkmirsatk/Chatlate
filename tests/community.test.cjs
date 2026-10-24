@@ -10,8 +10,7 @@ test('banner expands localized inline links with host icons and never opens a po
   runtime.native.icons = { common: (name) => ({ hostIcon: name }) };
   const h = harness({}, undefined, 'en', runtime.native);
   h.page.items();
-  runtime.flush();
-  await new Promise((resolve) => setTimeout(resolve, 5));
+  await runtime.ready();
   const header = h.page
     .items()
     .find((row) => row.native?.values.setImportantForAccessibility === 1).native;
@@ -93,8 +92,7 @@ test('community profiles load lazily and use the real title and account-scoped a
   };
   const h = harness({}, undefined, 'en', runtime.native);
   h.page.items();
-  runtime.flush();
-  await new Promise((resolve) => setTimeout(resolve, 5));
+  await runtime.ready();
   const header = h.page
     .items()
     .find((row) => row.native?.values.setImportantForAccessibility === 1).native;
@@ -146,8 +144,7 @@ test('community photo changes refresh visible rows and stop after closing', asyn
     },
   });
   h.page.items();
-  runtime.flush();
-  await new Promise((resolve) => setTimeout(resolve, 5));
+  await runtime.ready();
   const header = h.page
     .items()
     .find((row) => row.native?.values.setImportantForAccessibility === 1).native;
@@ -184,8 +181,7 @@ test('denied community lookups preserve generic icons without retrying every ren
   runtime.native.icons = { common: (name) => ({ hostIcon: name }) };
   const h = harness({}, undefined, 'tr', runtime.native);
   h.page.items();
-  runtime.flush();
-  await new Promise((resolve) => setTimeout(resolve, 5));
+  await runtime.ready();
   const header = h.page
     .items()
     .find((row) => row.native?.values.setImportantForAccessibility === 1).native;
@@ -220,8 +216,7 @@ test('closed community sections ignore late profile results', async () => {
   });
   const h = harness({}, undefined, 'en', runtime.native);
   h.page.items();
-  runtime.flush();
-  await new Promise((resolve) => setTimeout(resolve, 5));
+  await runtime.ready();
   const header = h.page
     .items()
     .find((row) => row.native?.values.setImportantForAccessibility === 1).native;
@@ -261,8 +256,7 @@ test('community avatars stay isolated when the active account changes', async ()
   };
   const h = harness({}, undefined, 'en', runtime.native);
   h.page.items();
-  runtime.flush();
-  await new Promise((resolve) => setTimeout(resolve, 5));
+  await runtime.ready();
   const header = h.page
     .items()
     .find((row) => row.native?.values.setImportantForAccessibility === 1).native;
@@ -296,8 +290,7 @@ test('inline community rows remain usable without optional host icons', async ()
   runtime.native.openUrl = (url) => urls.push(url);
   const h = harness({}, undefined, 'tr', runtime.native);
   h.page.items();
-  runtime.flush();
-  await new Promise((resolve) => setTimeout(resolve, 5));
+  await runtime.ready();
   const header = h.page
     .items()
     .find((row) => row.native?.values.setImportantForAccessibility === 1).native;
@@ -316,18 +309,15 @@ test('closing settings cancels queued expansion and reopening starts collapsed',
   const runtime = bannerRuntime(),
     h = harness({}, undefined, 'en', runtime.native);
   h.page.items();
-  runtime.flush();
-  await new Promise((resolve) => setTimeout(resolve, 5));
+  await runtime.ready();
   let header = h.page
     .items()
     .find((row) => row.native?.values.setImportantForAccessibility === 1).native;
   runtime.click(header);
   h.page.onClose();
-  runtime.flush();
-  await new Promise((resolve) => setTimeout(resolve, 5));
+  await runtime.ready();
   h.page.items();
-  runtime.flush();
-  await new Promise((resolve) => setTimeout(resolve, 5));
+  await runtime.ready();
   assert.equal(
     h.page.items().some((row) => row.id === 'community.channel'),
     false,
@@ -341,8 +331,7 @@ test('closing settings cancels queued expansion and reopening starts collapsed',
   h.page.onClose();
   runtime.flush();
   h.page.items();
-  runtime.flush();
-  await new Promise((resolve) => setTimeout(resolve, 5));
+  await runtime.ready();
   assert.equal(
     h.page.items().some((row) => row.id === 'community.channel'),
     false,
@@ -351,13 +340,11 @@ test('closing settings cancels queued expansion and reopening starts collapsed',
   runtime.flush();
 });
 
-test('first settings render waits for the banner and publishes the complete list together', async () => {
+test('settings controls remain available while the banner loads', async () => {
   const runtime = bannerRuntime(),
     h = harness({}, undefined, 'en', runtime.native);
-  assert.deepEqual(Array.from(h.page.items()), []);
-  assert.deepEqual(Array.from(h.page.items()), []);
-  runtime.flush();
-  await new Promise((resolve) => setTimeout(resolve, 5));
+  assert.ok(h.page.items().some((row) => row.id === 'test'));
+  await runtime.ready();
   const rows = h.page.items(),
     header = rows[0].native;
   assert.equal(header.values.setContentDescription, 'Chatlate');
@@ -365,9 +352,8 @@ test('first settings render waits for the banner and publishes the complete list
   assert.equal(h.page.items()[0].native, header);
   h.page.onClose();
   runtime.flush();
-  assert.deepEqual(Array.from(h.page.items()), []);
-  runtime.flush();
-  await new Promise((resolve) => setTimeout(resolve, 5));
+  assert.ok(h.page.items().some((row) => row.id === 'test'));
+  await runtime.ready();
   assert.equal(h.page.items()[0].native.values.setContentDescription, 'Chatlate');
   h.page.onClose();
   runtime.flush();
@@ -476,8 +462,7 @@ test('community menu keeps GitHub and permanent version history above support as
   runtime.native.openUrl = (url) => urls.push(url);
   const h = harness({}, undefined, 'en', runtime.native);
   h.page.items();
-  runtime.flush();
-  await new Promise((resolve) => setTimeout(resolve, 5));
+  await runtime.ready();
   const banner = h.page.items()[0].native;
   assert.equal(
     h.page.items().some((row) => row.id === 'release.notes'),

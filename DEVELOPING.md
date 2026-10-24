@@ -24,14 +24,14 @@ Run `npm run format` after editing code. The installer preserves indentation and
 | `settings.js`, native view modules | Settings composition, language controls, dragging and status |
 | `updates/` | Release checks, package verification, native import, notes and completion |
 | `distribution.js`, `identity.js` | Repository configuration and stable plugin identities |
-| `i18n.js`, `language-catalog.js`, `storage.js` | Language selection, preferences and migration |
+| `i18n.js`, `language-catalog.js`, `storage.js` | Language selection and preferences |
 | `tests/helpers/` | Shared plugin sandbox and native UI fixtures |
 
-Translation text is user data: never log it or send it to the distribution service. Keep the plugin ID, `multi.*` provider IDs and `multi-translate.*` preference keys stable. Some internal names predate Chatlate and are migration contracts.
+Translation text is user data: never log it or send it to the distribution service. Keep the plugin ID, `chatlate.*` provider IDs and `chatlate.*` preference keys stable after release: renaming them resets users' selections and settings.
 
 ## Add a provider
 
-Implement `Provider` from `src/provider.js`, register it in `src/index.js`, add its stable ID to `identity.js` and declare only its required fetch host. Reuse `createQueuedProvider` for caching, spacing, cancellation and cooldowns. Preserve the complete fragment contract: reject missing or changed separators instead of applying partial translations. Add request, cancellation, quota and formatting regression coverage.
+Implement `Provider` from `src/provider.js`, register it in `src/index.js`, add its stable ID to `identity.js` and declare only its required fetch host. Reuse `createQueuedProvider` for caching, spacing, cancellation and cooldowns. Preserve the complete fragment contract: reject missing or changed separators with `InvalidResponseError` instead of applying partial translations, so the next enabled service can retry. Use `batchSize`/`batchLimit` when the service bounds request size by encoded bytes. Add request, cancellation, quota and formatting regression coverage.
 
 ## Add a language
 
@@ -41,7 +41,9 @@ Add its base code, display name and flag ID to `language-catalog.js`, a full tra
 
 ## Artwork and support
 
-The static 2:1 banner is `assets/chatlate-settings-poster.webp`. Run `npm run embed:banner` after changing it. Current branding exports stay in `assets/`; keep design experiments out of the repository.
+The static 2:1 banner is `assets/chatlate-settings-poster.webp`. The SDK bundles it directly; rebuild after changing it. Current branding exports stay in `assets/`; keep design experiments out of the repository.
+
+The CLI and API types are pinned to SDK 49. The banner is a lazy `File` asset in the installer's footer, outside executable JavaScript. Its bytes are read when settings needs the image; closing settings discards pending reads and releases the native image. Inugram v13.0.3-49 or later is required.
 
 Community destinations are defined in `community-links.js`. Channel/group photos are resolved only while expanded and refreshed from the active account's public peer cache. The GitHub menu uses `distribution.js` when configured and otherwise opens the author profile. `community-icons.js` contains fixed local marks.
 

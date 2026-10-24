@@ -26,8 +26,13 @@ export function installPackage(bytes, expectedHash, version, signal) {
   const fragment = inu.android.getCurrentFragment();
   if (!fragment || signal.aborted) throw Error('Update page closed');
   // Never call PluginManager.update directly: the native sheet must display grant changes.
-  inu.jvm
+  const importer = inu.jvm
     .cls('desu.inugram.helpers.plugins.PluginImportHelper')
-    .getStaticField('INSTANCE')
-    .call('startImport', fragment, source);
+    .getStaticField('INSTANCE');
+  try {
+    // Current hosts add a Kotlin default `origin` parameter, which the JVM bridge must receive.
+    importer.call('startImport', fragment, source, null);
+  } catch {
+    importer.call('startImport', fragment, source);
+  }
 }

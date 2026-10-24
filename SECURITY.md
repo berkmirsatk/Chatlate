@@ -4,15 +4,16 @@ This document describes Chatlate 1.0.0's intended scope. Automated tests use sim
 
 ## Translation and settings
 
-Inugram supplies the text selected for translation. Unprotected fragments and the target language go over HTTPS to Google or Yandex. Enabled backups may receive the same fragments when earlier services fail. Google's query URL includes submitted text. Providers may retain requests under their own policies; plugin requests do not use Inugram's proxy.
+Inugram supplies the text selected for translation. Unprotected fragments and the target language go over HTTPS to Google or Yandex. Enabled backups may receive the same fragments when earlier services fail. Text travels in request bodies, not URLs. Providers may retain requests under their own policies; plugin requests do not use Inugram's proxy.
 
-There is no telemetry or persistent message archive. Translation caches are bounded and memory-only. Local preferences store language, provider order, migration state, cooldowns and a pending update version. Chatlate does not read clipboard contents or request arbitrary filesystem access.
+There is no telemetry or persistent message archive. Translation caches are bounded and memory-only. Local preferences store language, provider order, cooldowns and a pending update version. Chatlate does not read clipboard contents or request arbitrary filesystem access.
 
 - Translation requests use fixed hosts, encoded parameters and disabled redirects. Response text is not executed or interpreted as message formatting.
 - Source entities and UTF-16 boundaries are validated. Protected spans and rebuilt offsets come from the source, not the provider response.
 - Input, output, queues and caches are bounded. Body-size validation occurs after reading a response, not as a streaming limit.
 - Each provider serializes requests and isolates shared-subscriber cancellation. HTTP 429 cooldowns persist and are capped at 15 minutes.
-- Fallback visits eligible services once within a shared budget. Cancellation, malformed responses and permanent HTTP errors stop the chain.
+- Fallback visits eligible services once within a shared budget. Connection failures, rate limits (including Google's CAPTCHA redirect), temporary HTTP errors and malformed responses move to the next service; cancellation, invalid source formatting and permanent HTTP errors stop the chain.
+- Requests group fragments by the app-detected source language, so one request never mixes languages.
 - Stored priorities accept registered IDs only. Native provider changes are read back before saving; unload resets Chatlate's active selection to Telegram and leaves external providers alone.
 
 ## Native UI and community links
