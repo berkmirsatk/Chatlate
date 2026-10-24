@@ -1,6 +1,6 @@
 const assert = require('node:assert/strict');
 const { test } = require('node:test');
-const { googleReply, code, harness, ok, run, replyWith } = require('./helpers/plugin-runtime.cjs');
+const { googleReply, harness, run, replyWith } = require('./helpers/plugin-runtime.cjs');
 
 test('nested formatting, protected code, URL and custom emoji survive changed lengths', async () => {
   const input = {
