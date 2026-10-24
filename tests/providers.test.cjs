@@ -177,6 +177,19 @@ test('Google CAPTCHA redirects start a cooldown and use the backup service', asy
   assert.ok(Number(h.storage.get('chatlate.google.blockedUntil')) > Date.now());
 });
 
+test('Google rejecting a large body uses the backup service', async () => {
+  for (const status of [405, 413]) {
+    const hosts = [];
+    const h = harness({ fallback: '["google","yandex"]' }, async (url) => {
+      hosts.push(new URL(url).hostname);
+      if (url.includes('yandex')) return ok({ code: 200, text: ['Merhaba'] });
+      return { ok: false, status, headers: { get: () => '' } };
+    });
+    assert.equal((await run(h, [{ text: 'Hello' }]))[0].text, 'Merhaba');
+    assert.deepEqual(hosts, ['translate.googleapis.com', 'translate.yandex.net']);
+  }
+});
+
 test('batches never mix detected source languages', async () => {
   const batches = [];
   const h = harness({ provider: 'yandex' }, async (url, options) => {

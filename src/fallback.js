@@ -31,10 +31,7 @@ function recoverable(error) {
     error instanceof ConnectionError ||
     error instanceof RateLimitError ||
     error instanceof InvalidResponseError ||
-    (error instanceof HttpError &&
-      (error.status === 408 ||
-        error.status === 429 ||
-        (error.status >= 500 && error.status <= 599)))
+    (error instanceof HttpError && error.temporary)
   );
 }
 

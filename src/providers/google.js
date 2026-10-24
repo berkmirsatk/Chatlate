@@ -52,9 +52,12 @@ export function createGoogleProvider() {
         'q=' + encodeURIComponent(text),
       );
     } catch (error) {
-      // Google answers automated-traffic blocks with a redirect to its CAPTCHA page.
-      if (error instanceof HttpError && error.status >= 300 && error.status < 400)
-        error.rateLimited = true;
+      if (error instanceof HttpError) {
+        // Google answers automated-traffic blocks with a redirect to its CAPTCHA page.
+        if (error.status >= 300 && error.status < 400) error.rateLimited = error.temporary = true;
+        // Some Google front ends reject large form bodies that others accept.
+        if (error.status === 405 || error.status === 413) error.temporary = true;
+      }
       throw error;
     }
     const rows = data?.[0];

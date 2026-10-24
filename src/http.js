@@ -23,6 +23,8 @@ export class HttpError extends Error {
     this.status = status;
     /** Providers may mark other statuses, such as a block-page redirect, as rate limits. */
     this.rateLimited = status === 429;
+    /** Set by providers when another service may still accept the same request. */
+    this.temporary = status === 408 || status === 429 || (status >= 500 && status <= 599);
     const seconds = Number(retryAfter);
     const until = Date.parse(retryAfter);
     this.retryAfterMs = Math.min(
