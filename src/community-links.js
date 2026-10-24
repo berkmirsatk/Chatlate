@@ -7,7 +7,7 @@ import { t } from './i18n.js';
 export const COMMUNITY_LINKS = [
   { label: 'channel', name: '@Plumgins', url: 'https://t.me/Plumgins' },
   { label: 'group', name: '@PlumginsChat', url: 'https://t.me/PlumginsChat' },
-  { label: 'github', name: 'berkmirsatk', url: REPOSITORY_URL || 'https://github.com/berkmirsatk' },
+  { label: 'github', name: 'berkmirsatk', url: REPOSITORY_URL },
 ];
 
 /** Resolve public community profiles only while their inline section is visible.

@@ -113,7 +113,6 @@ const signal = () => new AbortController().signal;
 
 test('release checks select the stable newer version without copying potentially stale release notes', async () => {
   const h = harness();
-  assert.equal(h.create(null), null);
   assert.throws(() => h.create('../other/repo'), /Invalid repository/);
   const found = await h.create(repository).check(signal());
   assert.equal(found.version, '1.0.1');

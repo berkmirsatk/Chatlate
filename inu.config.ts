@@ -1,4 +1,3 @@
-import { REPOSITORY } from './src/distribution.js';
 import { PLUGIN_ID, PLUGIN_DESCRIPTIONS, PLUGIN_VERSION } from './src/identity.js';
 import { defineConfig } from '@inugram/cli';
 export default defineConfig({
@@ -24,9 +23,8 @@ export default defineConfig({
         grants: [
           'fetch(translate.googleapis.com)',
           'fetch(translate.yandex.net)',
-          ...(REPOSITORY
-            ? ['fetch(api.github.com)', 'fetch(release-assets.githubusercontent.com)']
-            : []),
+          'fetch(api.github.com)',
+          'fetch(release-assets.githubusercontent.com)',
           'openUrl',
           'clipboard.write',
           'account.read(peers)',

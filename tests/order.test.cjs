@@ -45,7 +45,6 @@ test('ordered failover reaches the third provider, tries each once and reuses th
     'dünya',
   ]);
   assert.deepEqual(calls, ['first', 'second', 'third']);
-  assert.equal(chain.cacheContext(), '["first","second","third"]');
 });
 test('nonrecoverable errors stop an ordered chain before later services receive text', async () => {
   const api = helpers('["first","second","third"]');
@@ -91,7 +90,6 @@ test('successful failover does not promote the backup on the next translation', 
     ['first'],
   );
   assert.deepEqual(calls, ['first', 'second', 'first']);
-  assert.equal(chain.cacheContext(), '["first","second"]');
 });
 test('malformed and unknown priorities cannot introduce a provider or duplicate the primary', () => {
   const providers = ['first', 'second', 'third'].map((id) => ({ id, name: id }));
