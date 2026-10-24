@@ -13,6 +13,7 @@
 - Drag providers to set their priority and enable or disable them individually.
 - Automatically try the next enabled provider when a service is temporarily unavailable.
 - Test providers and view connection status and response time.
+- Translate from non-Latin scripts reliably, and keep messages in different languages in separate requests.
 
 **Currently supported:** Google · Yandex
 

@@ -60,7 +60,7 @@ test('quota fallback retries all fragments on Yandex and preserves nested entiti
   assert.equal(calls.length, 2);
 });
 
-test('network and temporary HTTP errors use backup; authorization and invalid responses do not', async () => {
+test('network, temporary HTTP errors and invalid responses use backup; authorization does not', async () => {
   for (const failure of ['network', 408, 503, 403, 'invalid']) {
     let backupCalls = 0;
     const h = harness({ fallback: '1' }, async (url) => {
@@ -78,10 +78,10 @@ test('network and temporary HTTP errors use backup; authorization and invalid re
         };
       return { ok: false, status: failure };
     });
-    if (['network', 408, 503].includes(failure))
-      assert.equal((await run(h, [{ text: 'Hello' }]))[0].text, 'Merhaba');
+    const recovers = ['network', 408, 503, 'invalid'].includes(failure);
+    if (recovers) assert.equal((await run(h, [{ text: 'Hello' }]))[0].text, 'Merhaba');
     else await assert.rejects(run(h, [{ text: 'Hello' }]));
-    assert.equal(backupCalls, ['network', 408, 503].includes(failure) ? 1 : 0);
+    assert.equal(backupCalls, recovers ? 1 : 0);
   }
 });
 
@@ -170,21 +170,23 @@ test('connection test checks each enabled service directly after a failed primar
   assert.equal(rows.find((row) => row.id === 'test').text, 'Bağlantıyı test et');
 });
 
-test('invalid formatting and changed Google separators never trigger backup', async () => {
-  let calls = 0;
-  const h = harness({ fallback: '1' }, async () => {
-    calls++;
+test('invalid formatting never triggers backup; changed Google separators do', async () => {
+  const hosts = [];
+  const h = harness({ fallback: '1' }, async (url, options) => {
+    hosts.push(new URL(url).hostname);
+    if (url.includes('yandex'))
+      return ok({ code: 200, text: new URLSearchParams(options.body).getAll('text') });
     return ok([[['broken separators']]]);
   });
   await assert.rejects(
     run(h, [{ text: 'Hello', entities: [{ _: 'messageEntityBold', offset: 0, length: 99 }] }]),
   );
-  assert.equal(calls, 0);
-  await assert.rejects(
-    run(h, [{ text: 'Hello world', entities: [{ _: 'messageEntityBold', offset: 0, length: 5 }] }]),
-    /separators/,
-  );
-  assert.equal(calls, 1);
+  assert.equal(hosts.length, 0);
+  const [result] = await run(h, [
+    { text: 'Hello world', entities: [{ _: 'messageEntityBold', offset: 0, length: 5 }] },
+  ]);
+  assert.equal(result.text, 'Hello world');
+  assert.deepEqual(hosts, ['translate.googleapis.com', 'translate.yandex.net']);
 });
 
 test('one timed-out fallback subscriber does not abort another shared primary request', async () => {

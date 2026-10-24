@@ -117,7 +117,7 @@ export function registerSettings(providers, refreshDescription) {
         try {
           provider.clearCache?.();
           // Test each enabled service directly, without translation failover.
-          await provider.translateParts(['Hello world'], 'tr', controller.signal);
+          await provider.translateParts(['Hello world'], getLanguage(), controller.signal);
           text = t('success');
           successful = true;
         } catch (error) {

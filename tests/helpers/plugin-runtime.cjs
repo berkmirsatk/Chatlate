@@ -128,13 +128,15 @@ async function waitUntil(predicate) {
   }
 }
 const ok = (data) => ({ ok: true, json: async () => data });
+/** Google receives its source text in the form body. */
+const googleText = (options) => new URLSearchParams(options?.body ?? '').get('q');
 const run = (h, texts, signal = new AbortController().signal) =>
   h.registered
     .get('multi.google-free')
     .translate({ texts, to: 'tr', from: texts.map(() => 'en'), signal });
 function replyWith(translations, inspect = () => {}) {
   return async (url, options) => {
-    const q = new URL(url).searchParams.get('q');
+    const q = googleText(options);
     inspect(url, options, q);
     let index = 0;
     const result = /⟦\d+:0⟧/.test(q)
@@ -152,6 +154,7 @@ const runWith = (h, id, texts, to = 'tr', signal = new AbortController().signal)
   h.registered.get('multi.' + id).translate({ texts, to, from: texts.map(() => 'en'), signal });
 
 module.exports = {
+  googleText,
   fs,
   vm,
   assert,

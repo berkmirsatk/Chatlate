@@ -12,10 +12,17 @@ const COLLECTION_WINDOW_MS = 60;
 
 /**
  * Shared bounded queue, fragment caching, cancellation and persisted rate-limit cooldown.
- * @param {{id: string, name: string, fetchParts: (texts: string[], to: string, signal: AbortSignal) => Promise<string[]>}} config
+ * `batchSize` measures a fragment against `batchLimit` when a service bounds its request size.
+ * @param {{id: string, name: string, fetchParts: (texts: string[], to: string, signal: AbortSignal) => Promise<string[]>, batchSize?: (text: string) => number, batchLimit?: number}} config
  * @returns {import('../provider.js').Provider}
  */
-export function createQueuedProvider({ id, name, fetchParts }) {
+export function createQueuedProvider({
+  id,
+  name,
+  fetchParts,
+  batchSize = (text) => text.length,
+  batchLimit = BATCH_MAX_CHARS,
+}) {
   // One shared queue across all chats and the connection-test button.
   const cache = createCache((value) => value.length);
   const pending = new Map();
@@ -50,17 +57,20 @@ export function createQueuedProvider({ id, name, fetchParts }) {
         if (delay > 0) await new Promise((resolve) => setTimeout(() => resolve(undefined), delay));
         const entries = [];
         let to = '',
+          from = null,
           size = 0;
         for (const entry of pending.values()) {
           if (!entry.waiters.size) {
             pending.delete(entry.key);
             continue;
           }
-          if (entries.length && entry.to !== to) continue;
-          if (entries.length && size + entry.text.length + 40 > BATCH_MAX_CHARS) break;
+          // Services detect one source language per request, so keep each batch to one.
+          if (entries.length && (entry.to !== to || entry.from !== from)) continue;
+          if (entries.length && size + batchSize(entry.text) + 40 > batchLimit) break;
           entries.push(entry);
           to = entry.to;
-          size += entry.text.length + 40;
+          from = entry.from;
+          size += batchSize(entry.text) + 40;
           if (entries.length >= 40) break;
         }
         if (!entries.length) continue;
@@ -85,7 +95,7 @@ export function createQueuedProvider({ id, name, fetchParts }) {
             finishEntry(entries[i], null, results[i]);
           }
         } catch (error) {
-          if (error instanceof HttpError && error.status === 429) {
+          if (error instanceof HttpError && error.rateLimited) {
             consecutive429++;
             const backoff = Math.min(MAX_COOLDOWN_MS, 60000 * 2 ** Math.min(consecutive429 - 1, 4));
             blockedUntil = Date.now() + Math.max(backoff, error.retryAfterMs);
@@ -104,16 +114,16 @@ export function createQueuedProvider({ id, name, fetchParts }) {
       running = false;
     }
   }
-  function enqueuePart(text, to, signal) {
+  function enqueuePart(text, to, from, signal) {
     if (signal.aborted) return Promise.reject(new Error(t('cancelled')));
-    const key = JSON.stringify([to, text]);
+    const key = JSON.stringify([to, from, text]);
     if (cache.has(key)) return Promise.resolve(cache.get(key));
     if (blockedUntil > Date.now()) return Promise.reject(cooldownError());
     if (text.length > 4000) return Promise.reject(new Error(t('fragmentTooLong')));
     let entry = pending.get(key);
     if (!entry) {
       if (pending.size >= MAX_QUEUE_ENTRIES) return Promise.reject(new Error(t('queueFull')));
-      entry = { key, text, to, waiters: new Set(), cancelBatch: null };
+      entry = { key, text, to, from, waiters: new Set(), cancelBatch: null };
       pending.set(key, entry);
     }
     const promise = new Promise((resolve, reject) => {
@@ -147,9 +157,13 @@ export function createQueuedProvider({ id, name, fetchParts }) {
   return {
     id,
     name,
-    async translateParts(texts, to, signal) {
+    async translateParts(texts, to, signal, from = undefined) {
       return validate(
-        await Promise.all(texts.map((text) => enqueuePart(text, to, signal))),
+        await Promise.all(
+          texts.map((text, i) =>
+            enqueuePart(text, to, typeof from?.[i] === 'string' ? from[i] : null, signal),
+          ),
+        ),
         texts.length,
       );
     },

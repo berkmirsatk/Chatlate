@@ -1,12 +1,20 @@
 const assert = require('node:assert/strict');
 const { test } = require('node:test');
-const { code, harness, ok, run, replyWith, runWith } = require('./helpers/plugin-runtime.cjs');
+const {
+  code,
+  googleText,
+  harness,
+  ok,
+  run,
+  replyWith,
+  runWith,
+} = require('./helpers/plugin-runtime.cjs');
 
 test('Google batches formatting fragments and repeated text into one HTTP request', async () => {
   let calls = 0;
-  const h = harness({}, async (url) => {
+  const h = harness({}, async (url, options) => {
     calls++;
-    const q = new URL(url).searchParams.get('q');
+    const q = googleText(options);
     assert.match(q, /⟦900000:0⟧/);
     return ok([[[q.replaceAll('Hello', 'Merhaba').replaceAll('world', 'dünya')]]]);
   });
@@ -42,13 +50,13 @@ test('Google serializes different target-language batches with minimum spacing',
   const starts = [];
   let active = 0,
     maxActive = 0;
-  const h = harness({}, async (url) => {
+  const h = harness({}, async (url, options) => {
     starts.push(Date.now());
     active++;
     maxActive = Math.max(maxActive, active);
     await new Promise((r) => setTimeout(r, 20));
     active--;
-    return ok([[[new URL(url).searchParams.get('q')]]]);
+    return ok([[[googleText(options)]]]);
   });
   const p = h.registered.get('multi.google-free');
   await Promise.all(
@@ -109,17 +117,102 @@ test('Google cancellation before dispatch sends no HTTP request', async () => {
   await new Promise((r) => setTimeout(r, 80));
 });
 
-test('Google sends the working browser headers and request parameters', async () => {
+test('Google posts text in the form body and requests only translations', async () => {
   const h = harness({}, async (url, opts) => {
     const u = new URL(url);
     assert.equal(u.hostname, 'translate.googleapis.com');
     assert.equal(u.searchParams.get('client'), 'gtx');
     assert.equal(u.searchParams.get('ie'), 'UTF-8');
-    assert.ok(u.searchParams.getAll('dt').includes('ss'));
+    assert.deepEqual(u.searchParams.getAll('dt'), ['t']);
+    assert.equal(u.searchParams.get('q'), null);
+    assert.equal(url.includes('Hello'), false);
+    assert.equal(opts.method, 'POST');
+    assert.match(opts.headers['content-type'], /^application\/x-www-form-urlencoded/);
+    assert.equal(googleText(opts), 'Hello');
     assert.match(opts.headers['User-Agent'], /Android.*Chrome.*Mobile/);
     return ok([[['merhaba']]]);
   });
   assert.equal((await run(h, [{ text: 'Hello' }]))[0].text, 'merhaba');
+});
+
+test('Google romanization rows for non-Latin text are ignored', async () => {
+  const h = harness({}, async () =>
+    ok([
+      [
+        ['Merhaba dünya. ', 'Привет мир. ', null, null, 10],
+        ['Nasılsın?', 'Как дела?', null, null, 10],
+        [null, null, null, 'Privet mir. Kak dela?'],
+      ],
+      null,
+      'ru',
+    ]),
+  );
+  const [result] = await run(h, [{ text: 'Привет мир. Как дела?' }]);
+  assert.equal(result.text, 'Merhaba dünya. Nasılsın?');
+});
+
+test('Google batches stay within an encoded size limit for non-Latin text', async () => {
+  const bodies = [];
+  const h = harness({}, async (url, options) => {
+    bodies.push(options.body.length);
+    const q = googleText(options);
+    return ok([[[q]]]);
+  });
+  const message = 'Привет мир, как у тебя дела сегодня? '.repeat(25).trim();
+  const results = await Promise.all([1, 2, 3].map((n) => run(h, [{ text: message + ' ' + n }])));
+  assert.equal(results.length, 3);
+  assert.ok(bodies.length >= 2);
+  assert.ok(bodies.every((size) => size <= 10500));
+});
+
+test('Google CAPTCHA redirects start a cooldown and use the backup service', async () => {
+  const hosts = [];
+  const h = harness({ fallback: '1' }, async (url) => {
+    hosts.push(new URL(url).hostname);
+    if (url.includes('yandex')) return ok({ code: 200, text: ['Merhaba'] });
+    return { ok: false, status: 302, headers: { get: () => '' } };
+  });
+  assert.equal((await run(h, [{ text: 'Hello' }]))[0].text, 'Merhaba');
+  assert.deepEqual(hosts, ['translate.googleapis.com', 'translate.yandex.net']);
+  assert.ok(Number(h.storage.get('multi-translate.google-free.blockedUntil')) > Date.now());
+});
+
+test('batches never mix detected source languages', async () => {
+  const batches = [];
+  const h = harness({ provider: 'yandex-free' }, async (url, options) => {
+    const texts = new URLSearchParams(options.body).getAll('text');
+    batches.push(texts);
+    return ok({ code: 200, text: texts.map((text) => text.toUpperCase()) });
+  });
+  const p = h.registered.get('multi.yandex-free');
+  const translate = (text, from) =>
+    p.translate({
+      texts: [{ text }],
+      to: 'tr',
+      from: [from],
+      signal: new AbortController().signal,
+    });
+  const results = await Promise.all([
+    translate('Привет', 'ru'),
+    translate('Hello', 'en'),
+    translate('Пока', 'ru'),
+  ]);
+  assert.deepEqual(
+    results.map((r) => r[0].text),
+    ['ПРИВЕТ', 'HELLO', 'ПОКА'],
+  );
+  assert.deepEqual(batches, [['Привет', 'Пока'], ['Hello']]);
+});
+
+test('Yandex receives supported codes for regional Chinese targets', async () => {
+  const langs = [];
+  const h = harness({}, async (url) => {
+    langs.push(new URL(url).searchParams.get('lang'));
+    return ok({ code: 200, text: ['你好'] });
+  });
+  for (const to of ['zh-CN', 'zh-TW', 'pt-BR'])
+    await runWith(h, 'yandex-free', [{ text: 'Hello ' + to }], to);
+  assert.deepEqual(langs, ['zh', 'zh', 'pt-BR']);
 });
 
 test('network errors are localized without exposing low-level error details', async () => {
@@ -226,14 +319,14 @@ test('malformed Google rows and excessive translated batches are rejected', asyn
 });
 
 test('HTTP redirects are disabled and do not send source text to a new host', async () => {
-  let calls = 0;
+  const hosts = [];
   const h = harness({ fallback: '1' }, async (url, options) => {
-    calls++;
+    hosts.push(new URL(url).hostname);
     assert.equal(options.redirect, 'manual');
     return { ok: false, status: 302, headers: { get: () => 'https://untrusted.example/' } };
   });
   await assert.rejects(run(h, [{ text: 'Private text' }]), /HTTP 302/);
-  assert.equal(calls, 1);
+  assert.deepEqual(hosts, ['translate.googleapis.com', 'translate.yandex.net']);
 });
 
 test('untrusted Retry-After and saved cooldowns cannot disable a provider indefinitely', async () => {

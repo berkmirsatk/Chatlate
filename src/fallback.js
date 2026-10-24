@@ -1,6 +1,6 @@
 import { get } from './storage.js';
 import { t } from './i18n.js';
-import { ConnectionError, HttpError, RateLimitError } from './http.js';
+import { ConnectionError, HttpError, InvalidResponseError, RateLimitError } from './http.js';
 import { TRANSLATION_BUDGET_MS } from './limits.js';
 
 /**
@@ -30,6 +30,7 @@ function recoverable(error) {
   return (
     error instanceof ConnectionError ||
     error instanceof RateLimitError ||
+    error instanceof InvalidResponseError ||
     (error instanceof HttpError &&
       (error.status === 408 ||
         error.status === 429 ||
@@ -44,8 +45,9 @@ function recoverable(error) {
  * @param {string} to
  * @param {AbortSignal} signal
  * @param {number} budget
+ * @param {readonly (string | null)[]} [from]
  */
-async function attempt(provider, texts, to, signal, budget) {
+async function attempt(provider, texts, to, signal, budget, from = undefined) {
   if (signal.aborted) throw new Error(t('cancelled'));
   const controller = new AbortController();
   let expired = false;
@@ -56,7 +58,7 @@ async function attempt(provider, texts, to, signal, budget) {
     controller.abort();
   }, budget);
   try {
-    return await provider.translateParts(texts, to, controller.signal);
+    return await provider.translateParts(texts, to, controller.signal, from);
   } catch (error) {
     if (signal.aborted) throw new Error(t('cancelled'));
     if (expired) throw new ConnectionError();
@@ -74,9 +76,9 @@ export function withFallback(primary, providers) {
   return {
     ...primary,
     cacheContext: () => JSON.stringify(getProviderOrder(primary, providers).map((item) => item.id)),
-    async translateParts(texts, to, signal) {
+    async translateParts(texts, to, signal, from = undefined) {
       const order = getProviderOrder(primary, providers);
-      if (order.length === 1) return primary.translateParts(texts, to, signal);
+      if (order.length === 1) return primary.translateParts(texts, to, signal, from);
       const deadline = Date.now() + TRANSLATION_BUDGET_MS;
       for (const [index, provider] of order.entries()) {
         const remaining = deadline - Date.now();
@@ -87,7 +89,7 @@ export function withFallback(primary, providers) {
             ? remaining
             : Math.min(5000, Math.floor(remaining / (order.length - index)));
         try {
-          return await attempt(provider, texts, to, signal, Math.max(1, budget));
+          return await attempt(provider, texts, to, signal, Math.max(1, budget), from);
         } catch (error) {
           if (signal.aborted || !recoverable(error) || index === order.length - 1) throw error;
           // Retry complete fragment sets; never mix provider outputs within a message.
