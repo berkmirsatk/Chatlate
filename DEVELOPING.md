@@ -69,10 +69,8 @@ The bot announces the newest published Release in `@Plumgins` once, records the 
 
 ## Version and publish
 
-Update `package.json`, `package-lock.json` and `PLUGIN_VERSION` in `identity.js` together. Use 1.0.1 for fixes, 1.1.0 for compatible features and 2.0.0 for breaking changes. The current first public release is 1.0.0.
+Update `package.json`, `package-lock.json` and `PLUGIN_VERSION` in `identity.js` together. Use 1.0.1 for fixes, 1.1.0 for compatible features and 2.0.0 for breaking changes.
 
-Complete [the device checklist](docs/RELEASE_CHECKLIST.md), run `npm run package`, commit the finished source and create a release from that commit. Do not publish demo scenarios or fake versions. GitHub's source ZIP includes the lockfile and license; the installer belongs in Release assets rather than the source tree.
-
-Alternatively, manually run **Actions → Prepare release** on the reviewed `main` commit. It installs dependencies, runs all package checks and uploads the installer/checksum to a draft Release using GitHub's own token. It refuses to overwrite a published Release and leaves publication to a separate explicit action. No personal access token is needed.
+Complete [the release checklist](docs/RELEASE_CHECKLIST.md), merge the finished source into `main` and run **Actions → Prepare release** on it. It installs dependencies, runs all package checks and uploads the installer/checksum to a draft Release using GitHub's own token. It refuses to overwrite a published Release and leaves publication to a separate explicit action. No personal access token is needed. Do not publish demo scenarios or fake versions; the installer belongs in Release assets rather than the source tree.
 
 SDK reference: https://github.com/teidesu/inugram/tree/main/sdk/docs

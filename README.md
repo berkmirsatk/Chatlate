@@ -50,7 +50,7 @@ npm run package
 
 Source modules remain readable; the build produces one installable `.inu.js` file. See [DEVELOPING.md](DEVELOPING.md), [CHANGELOG.md](CHANGELOG.md) and the [release checklist](docs/RELEASE_CHECKLIST.md).
 
-Chatlate checks this repository's latest public Release when settings opens. Newer versions appear below the banner; installation starts only after a tap and uses Inugram's normal confirmation screen. Checks send no translation text or account token. While the repository is private or has no public Release, no update is offered. Version history and release notes are fetched from `CHANGELOG.md` on `main` whenever opened; the same text is shared with GitHub Releases and the Telegram post. Reading notes requires a connection and a public repository.
+Chatlate checks this repository's latest public Release when settings opens. Newer versions appear below the banner; installation starts only after a tap and uses Inugram's normal confirmation screen. Checks send no translation text or account token. Version history and release notes are fetched from `CHANGELOG.md` on `main` whenever opened; the same text is shared with GitHub Releases and the Telegram post. Reading notes requires a connection.
 
 ## License
 
