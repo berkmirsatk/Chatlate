@@ -2,7 +2,6 @@ const assert = require('node:assert/strict');
 const { test } = require('node:test');
 const {
   googleReply,
-  code,
   harness,
   summaryValue,
   openOrder,
@@ -212,7 +211,7 @@ test('native connection statuses share one box and preserve individual themed co
             return Group;
           if (name.endsWith('ApplicationLoader')) return { getStaticField: () => 'app' };
           if (name.endsWith('Theme'))
-            return { getStaticField: (key) => key, callStatic: (method, key) => key };
+            return { getStaticField: (key) => key, callStatic: (_method, key) => key };
           throw Error(name);
         },
       },
@@ -707,7 +706,7 @@ test('timing out a service still tests the next enabled provider', async () => {
     async (url, options) => {
       calls.push(url.includes('yandex') ? 'Yandex' : 'Google');
       if (url.includes('yandex')) return ok({ code: 200, text: ['Merhaba'] });
-      return new Promise((resolve, reject) =>
+      return new Promise((_resolve, reject) =>
         options.signal.addEventListener('abort', () => reject(Error('aborted')), { once: true }),
       );
     },
@@ -737,7 +736,7 @@ test('closing settings aborts the running connection test and skips remaining se
     calls.push(url);
     signal = options.signal;
     started();
-    return new Promise((resolve, reject) =>
+    return new Promise((_resolve, reject) =>
       signal.addEventListener('abort', () => reject(Error('aborted')), { once: true }),
     );
   });
@@ -988,7 +987,7 @@ test('unload leaves externally selected providers alone and safely handles faile
   const failedUnloaders = [];
   let rejectWrites = false;
   const config = {
-    call(method, arg) {
+    call(method) {
       if (method === 'getValue') return 'own-install:chatlate.google';
       if (method === 'setValue') {
         if (rejectWrites) throw Error('Write failed');

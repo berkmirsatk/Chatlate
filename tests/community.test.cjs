@@ -1,6 +1,6 @@
 const assert = require('node:assert/strict');
 const { test } = require('node:test');
-const { harness, ok } = require('./helpers/plugin-runtime.cjs');
+const { harness } = require('./helpers/plugin-runtime.cjs');
 const { bannerRuntime } = require('./helpers/native-runtime.cjs');
 
 test('banner expands localized inline links with host icons and never opens a popup', async () => {

@@ -2,7 +2,6 @@ const assert = require('node:assert/strict');
 const { test } = require('node:test');
 const {
   googleReply,
-  code,
   googleText,
   googleTexts,
   harness,
@@ -14,7 +13,7 @@ const {
 
 test('Google batches formatting fragments and repeated text into one HTTP request', async () => {
   const batches = [];
-  const h = harness({}, async (url, options) => {
+  const h = harness({}, async (_url, options) => {
     const texts = googleTexts(options);
     batches.push(texts);
     return googleReply(
@@ -53,7 +52,7 @@ test('Google serializes different target-language batches with minimum spacing',
   const starts = [];
   let active = 0,
     maxActive = 0;
-  const h = harness({}, async (url, options) => {
+  const h = harness({}, async (_url, options) => {
     starts.push(Date.now());
     active++;
     maxActive = Math.max(maxActive, active);
@@ -105,7 +104,7 @@ test('cancelling one Google subscriber keeps the shared request alive for anothe
   let started, release;
   const began = new Promise((r) => (started = r)),
     gate = new Promise((r) => (release = r));
-  const h = harness({}, async (url, opts) => {
+  const h = harness({}, async (_url, opts) => {
     started();
     await gate;
     assert.equal(opts.signal.aborted, false);
@@ -158,7 +157,7 @@ test('Google accepts a lone reply without the outer list', async () => {
 
 test('Google batches stay within an encoded size limit for non-Latin text', async () => {
   const bodies = [];
-  const h = harness({}, async (url, options) => {
+  const h = harness({}, async (_url, options) => {
     bodies.push(options.body.length);
     return googleReply(googleTexts(options));
   });
@@ -196,7 +195,7 @@ test('Google rejecting a large body uses the backup service', async () => {
 
 test('batches never mix detected source languages', async () => {
   const batches = [];
-  const h = harness({ provider: 'yandex' }, async (url, options) => {
+  const h = harness({ provider: 'yandex' }, async (_url, options) => {
     const texts = new URLSearchParams(options.body).getAll('text');
     batches.push(texts);
     return ok({ code: 200, text: texts.map((text) => text.toUpperCase()) });

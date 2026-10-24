@@ -2,7 +2,6 @@ const assert = require('node:assert/strict');
 const { test } = require('node:test');
 const {
   googleReply,
-  code,
   harness,
   summaryValue,
   orderAction,
@@ -111,10 +110,10 @@ test('cancelled translation never starts a backup request', async () => {
   let started;
   const began = new Promise((resolve) => (started = resolve));
   let calls = 0;
-  const h = harness({ fallback: '["google","yandex"]' }, async (url, options) => {
+  const h = harness({ fallback: '["google","yandex"]' }, async (_url, options) => {
     calls++;
     started();
-    return new Promise((resolve, reject) =>
+    return new Promise((_resolve, reject) =>
       options.signal.addEventListener('abort', () => reject(Error('aborted'))),
     );
   });
@@ -134,7 +133,7 @@ test('primary attempt timeout leaves time for backup within the host budget', as
     async (url, options) => {
       calls.push(new URL(url).hostname);
       if (url.includes('yandex')) return ok({ code: 200, text: ['Merhaba'] });
-      return new Promise((resolve, reject) =>
+      return new Promise((_resolve, reject) =>
         options.signal.addEventListener('abort', () => reject(Error('aborted'))),
       );
     },
@@ -200,11 +199,11 @@ test('one timed-out fallback subscriber does not abort another shared primary re
     { fallback: '["google","yandex"]' },
     async (url, options) => {
       calls++;
-      if (url.includes('yandex')) return ok({ code: 200, text: ['Yedek'] });
+      if (url.includes('yandex')) return ok({ code: 200, text: ['From Yandex'] });
       started();
       await gate;
       assert.equal(options.signal.aborted, false);
-      return googleReply(['Birincil']);
+      return googleReply(['From Google']);
     },
     'en',
     {},
@@ -213,8 +212,8 @@ test('one timed-out fallback subscriber does not abort another shared primary re
   const first = run(h, [{ text: 'Hello' }]);
   const second = run(h, [{ text: 'Hello' }]);
   await began;
-  assert.equal((await first)[0].text, 'Yedek');
+  assert.equal((await first)[0].text, 'From Yandex');
   release();
-  assert.equal((await second)[0].text, 'Birincil');
+  assert.equal((await second)[0].text, 'From Google');
   assert.equal(calls, 2);
 });

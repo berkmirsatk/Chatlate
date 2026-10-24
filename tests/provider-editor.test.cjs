@@ -1,6 +1,6 @@
 const assert = require('node:assert/strict');
 const { test } = require('node:test');
-const { harness, summaryValue, openOrder, ok } = require('./helpers/plugin-runtime.cjs');
+const { harness, summaryValue, openOrder } = require('./helpers/plugin-runtime.cjs');
 const { toggleSymbol, dragRuntime, nativeOrderPage } = require('./helpers/native-runtime.cjs');
 
 test('provider expansion waits for native rows without displaying temporary fallback rows', async () => {
@@ -33,14 +33,14 @@ test('inline provider editor uses native dragging and persists only a completed 
   assert.equal(runtime.drag(root, 1), true);
   assert.equal(runtime.queue.length, 0);
   runtime.flush();
-  runtime.event(root, 2, 0);
+  runtime.event(2, 0);
   assert.equal(root.children[1].values.setTranslationY, 0);
   assert.equal(root.children[0].values.setTranslationY, 56);
   assert.equal(root.values.setClipChildren, true);
   assert.equal(root.children[1].values.setAlpha, undefined);
   assert.equal(runtime.value, 'drag-installation:chatlate.google');
-  runtime.event(root, 3, 0);
-  runtime.event(root, 4, 0);
+  runtime.event(3, 0);
+  runtime.event(4, 0);
   await new Promise((resolve) => setTimeout(resolve, 5));
   assert.equal(runtime.value, 'drag-installation:chatlate.yandex');
   assert.equal(h.storage.get('chatlate.fallback'), '["yandex","google"]');
@@ -61,8 +61,8 @@ test('cancelled native dragging restores visual order and does not save changes'
   const before = h.storage.get('chatlate.fallback');
   runtime.drag(root, 1);
   runtime.flush();
-  runtime.event(root, 2, 0);
-  runtime.event(root, 4, 0);
+  runtime.event(2, 0);
+  runtime.event(4, 0);
   await new Promise((resolve) => setTimeout(resolve, 5));
   assert.equal(root.children[0].values.setTag, 'google');
   assert.equal(h.storage.get('chatlate.fallback'), before);
@@ -77,8 +77,8 @@ test('failed native primary change rejects a dropped order and restores the save
   const before = h.storage.get('chatlate.fallback');
   runtime.drag(root, 1);
   runtime.flush();
-  runtime.event(root, 3, 0);
-  runtime.event(root, 4, 0);
+  runtime.event(3, 0);
+  runtime.event(4, 0);
   await new Promise((resolve) => setTimeout(resolve, 5));
   assert.equal(h.storage.get('chatlate.fallback'), before);
   assert.ok(page.items().some((row) => String(row.text).includes('Could not update Inugram')));
@@ -96,7 +96,7 @@ test('closing an order page prevents queued drops or native builds from changing
   const before = h.storage.get('chatlate.fallback');
   runtime.drag(root, 1);
   runtime.flush();
-  runtime.event(root, 3, 0);
+  runtime.event(3, 0);
   page.onClose();
   runtime.flush();
   await new Promise((resolve) => setTimeout(resolve, 5));
@@ -126,7 +126,7 @@ test('completed reorder preserves the native group and preserves rows during the
   const rows = [...root.children],
     refreshes = page.invalidations;
   runtime.drag(root, 1);
-  runtime.event(root, 3, 0);
+  runtime.event(3, 0);
   await new Promise((resolve) => setTimeout(resolve, 5));
   runtime.flush();
   assert.equal(page.items().find((row) => row.native).native, root);
@@ -136,7 +136,7 @@ test('completed reorder preserves the native group and preserves rows during the
   assert.equal(root.children[0].values.setTranslationY, 56);
   // A second gesture uses the existing row's settled position, not its original child index.
   runtime.drag(root, 0);
-  runtime.event(root, 3, 0);
+  runtime.event(3, 0);
   await new Promise((resolve) => setTimeout(resolve, 5));
   runtime.flush();
   assert.equal(runtime.value, 'drag-installation:chatlate.google');
@@ -214,7 +214,7 @@ test('provider label taps and small finger movements never change selection or p
     assert.equal(label.values.setClickable, false);
     runtime.click(label);
     runtime.drag(root, 1);
-    runtime.event(root, 3, 60);
+    runtime.event(3, 60);
     await new Promise((resolve) => setTimeout(resolve, 5));
     runtime.flush();
     assert.equal(runtime.value, 'drag-installation:chatlate.google');
@@ -231,7 +231,7 @@ test('collapsing the provider section discards a queued completed drop', async (
   const { root } = await nativeOrderPage(h, runtime);
   const before = h.storage.get('chatlate.fallback');
   runtime.drag(root, 1);
-  runtime.event(root, 3, 0);
+  runtime.event(3, 0);
   h.page
     .items()
     .find((row) => row.id === 'provider')
@@ -292,7 +292,7 @@ test('custom icons stay centered and consistent while left handles drag and labe
     assert.equal(toggleSymbol(toggle), '⊖');
   }
   runtime.drag(group, 1);
-  runtime.event(group, 3, 0);
+  runtime.event(3, 0);
   await new Promise((resolve) => setTimeout(resolve, 5));
   runtime.flush();
   h.page.items();
@@ -320,12 +320,12 @@ test('settings refreshes preserve an active drag and its pending drop', async ()
     h = harness({ fallback: '["google","yandex"]' }, undefined, 'en', runtime.native);
   const { page, root } = await nativeOrderPage(h, runtime);
   runtime.drag(root, 1);
-  runtime.event(root, 2, 0);
+  runtime.event(2, 0);
   page.items();
   runtime.flush();
   assert.equal(root.children[1].values.setTranslationY, 0);
   assert.equal(root.children[0].values.setTranslationY, 56);
-  runtime.event(root, 3, 0);
+  runtime.event(3, 0);
   page.items();
   runtime.flush();
   await new Promise((resolve) => setTimeout(resolve, 5));

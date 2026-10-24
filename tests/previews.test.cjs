@@ -1,6 +1,6 @@
 const assert = require('node:assert/strict');
 const { test } = require('node:test');
-const { harness, ok } = require('./helpers/plugin-runtime.cjs');
+const { harness } = require('./helpers/plugin-runtime.cjs');
 const { bannerRuntime, dragRuntime, nativeOrderPage } = require('./helpers/native-runtime.cjs');
 
 test('order summary delegates overflow scrolling to Android and expands the provider editor', async () => {
@@ -102,14 +102,14 @@ test('contained dragging clamps boxes to the list boundary and cancels without d
   const { page, root } = await nativeOrderPage(h, runtime);
   const original = [...root.children];
   runtime.drag(root, 1);
-  runtime.event(root, 2, -10000);
+  runtime.event(2, -10000);
   assert.equal(root.children[1].values.setTranslationY, 0);
   assert.equal(root.children[0].values.setTranslationY, 56);
   assert.equal(root.values.setClipToPadding, true);
   assert.equal(root.values.setBackgroundColor, 'key_windowBackgroundWhite');
   assert.equal(root.values.setClipToOutline, false);
   assert.deepEqual(root.children, original);
-  runtime.event(root, 4, -10000);
+  runtime.event(4, -10000);
   for (const [index, box] of root.children.entries())
     assert.equal(box.values.setTranslationY, index * 56);
   assert.equal(runtime.value, 'drag-installation:chatlate.google');
@@ -134,7 +134,7 @@ test('summary updates reuse the header and keep expansion on the same page', asy
   await new Promise((resolve) => setTimeout(resolve, 5));
   runtime.flush();
   runtime.drag(root, 1);
-  runtime.event(root, 3, 0);
+  runtime.event(3, 0);
   await new Promise((resolve) => setTimeout(resolve, 5));
   runtime.flush();
   h.page.items();
@@ -199,7 +199,7 @@ test('SDK previews scroll only when narrow, stop when wide, and never change ano
     if (name === 'android.view.View$MeasureSpec')
       return {
         getStaticField: () => 1073741824,
-        callStatic: (method, size, mode) => ({ size, mode }),
+        callStatic: (_method, size, mode) => ({ size, mode }),
       };
     if (
       [

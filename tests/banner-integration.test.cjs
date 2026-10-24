@@ -1,6 +1,6 @@
 const assert = require('node:assert/strict');
 const { test } = require('node:test');
-const { harness, ok } = require('./helpers/plugin-runtime.cjs');
+const { harness } = require('./helpers/plugin-runtime.cjs');
 const { bannerRuntime } = require('./helpers/native-runtime.cjs');
 const { bundledAssets } = require('./helpers/bundled-assets.cjs');
 

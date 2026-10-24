@@ -127,7 +127,7 @@ function dragRuntime(
       this.values[method] = args[0];
     }
   }
-  function emit(root, action, y = 0) {
+  function emit(action, y = 0) {
     const listener = touched.values.setOnTouchListener;
     // Old test helper names: 3 = release, 4 = cancel; MotionEvent uses 1 and 3.
     const touchAction = action === 3 ? 1 : action === 4 ? 3 : action;
@@ -210,12 +210,12 @@ function dragRuntime(
         if (name.endsWith('ApplicationLoader'))
           return { getStaticField: () => (languageFlags ? new View() : 'context') };
         if (name.endsWith('Theme'))
-          return { getStaticField: (key) => key, callStatic: (method, key) => key };
+          return { getStaticField: (key) => key, callStatic: (_method, key) => key };
         if (name === 'android.graphics.Bitmap$Config' || name === 'android.graphics.Paint$Style')
           return { getStaticField: (key) => key };
         if (name === 'android.graphics.Bitmap')
           return {
-            callStatic(method, width, height, config) {
+            callStatic(_method, width, height, config) {
               assert.equal(onUi, true);
               return { width, height, config };
             },
@@ -321,8 +321,8 @@ function dragRuntime(
         listener?.spec.methods.onClick.body(listener, root);
       });
     },
-    event(root, action, y) {
-      return onUiThread(() => emit(root, action, y));
+    event(action, y) {
+      return onUiThread(() => emit(action, y));
     },
   };
 }
