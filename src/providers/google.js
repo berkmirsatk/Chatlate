@@ -1,5 +1,4 @@
 import { request, HttpError, InvalidResponseError } from '../http.js';
-import { validate } from '../formatting.js';
 import { createQueuedProvider } from './queued.js';
 
 const USER_AGENT =
@@ -7,77 +6,54 @@ const USER_AGENT =
 // Google rejects some larger form bodies; bound the encoded size rather than the text length.
 const MAX_ENCODED_BATCH = 10000;
 
+/** This endpoint reads text as HTML, so keep literal markup and entities as text.
+ * @param {string} text */
+const escape = (text) =>
+  text.replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;');
+const encodedSize = (text) => encodeURIComponent(escape(text)).length;
+
 /** @returns {import('../provider.js').Provider} */
 export function createGoogleProvider() {
-  function joinBatch(texts) {
-    let tag = 900000;
-    while (texts.some((text) => text.includes('⟦' + tag + ':'))) tag++;
-    const marker = (i) => '⟦' + tag + ':' + i + '⟧';
-    return {
-      text: texts.map((text, i) => marker(i) + '\n' + text + '\n').join('') + marker(texts.length),
-      marker,
-    };
-  }
-  function splitBatch(text, count, marker) {
-    const result = [];
-    let end = 0;
-    for (let i = 0; i <= count; i++) {
-      const token = marker(i),
-        at = text.indexOf(token, end);
-      if (at < 0 || text.indexOf(token, at + token.length) !== -1)
-        throw new InvalidResponseError('batchMarkers');
-      if (i === 0) {
-        if (text.slice(0, at).trim()) throw new InvalidResponseError();
-      } else result.push(text.slice(end, at).trim());
-      end = at + token.length;
-    }
-    if (text.slice(end).trim()) throw new InvalidResponseError();
-    return validate(result, count);
-  }
-  async function fetchTranslation(text, to, signal) {
-    const headers = {
-      'User-Agent': USER_AGENT,
-      'Accept-Language': 'en-US,en;q=0.9',
-      'content-type': 'application/x-www-form-urlencoded;charset=UTF-8',
-    };
-    let data;
-    try {
-      // Text goes in the form body: long non-Latin text exceeds Google's URL limit.
-      data = await request(
-        'https://translate.googleapis.com/translate_a/single?client=gtx&sl=auto&tl=' +
-          encodeURIComponent(to) +
-          '&dt=t&ie=UTF-8&oe=UTF-8',
-        headers,
-        signal,
-        'q=' + encodeURIComponent(text),
-      );
-    } catch (error) {
-      if (error instanceof HttpError) {
-        // Google answers automated-traffic blocks with a redirect to its CAPTCHA page.
-        if (error.status >= 300 && error.status < 400) error.rateLimited = error.temporary = true;
-        // Some Google front ends reject large form bodies that others accept.
-        if (error.status === 405 || error.status === 413) error.temporary = true;
-      }
-      throw error;
-    }
-    const rows = data?.[0];
-    if (!Array.isArray(rows) || rows.length > 1000 || !rows.every(Array.isArray))
-      throw new InvalidResponseError();
-    // Rows without a string translation carry romanization for non-Latin text.
-    const translated = rows.filter((row) => typeof row[0] === 'string');
-    if (!translated.length || rows.some((row) => row[0] != null && typeof row[0] !== 'string'))
-      throw new InvalidResponseError();
-    return translated.map((row) => row[0]).join('');
-  }
   return createQueuedProvider({
     id: 'google',
     name: 'Google',
-    batchSize: (text) => encodeURIComponent(text).length,
+    batchSize: encodedSize,
     batchLimit: MAX_ENCODED_BATCH,
+    // Each text is detected separately, so one request may mix languages.
+    detectsEachText: true,
     async fetchParts(texts, to, signal) {
-      const joined = texts.length > 1 ? joinBatch(texts) : null;
-      const full = await fetchTranslation(joined ? joined.text : texts[0], to, signal);
-      return joined ? splitBatch(full, texts.length, joined.marker) : validate([full], 1);
+      const headers = {
+        'User-Agent': USER_AGENT,
+        'Accept-Language': 'en-US,en;q=0.9',
+        'content-type': 'application/x-www-form-urlencoded;charset=UTF-8',
+      };
+      let data;
+      try {
+        // Text goes in the form body: long non-Latin text exceeds Google's URL limit.
+        data = await request(
+          'https://translate.googleapis.com/translate_a/t?client=gtx&sl=auto&tl=' +
+            encodeURIComponent(to),
+          headers,
+          signal,
+          texts.map((text) => 'q=' + encodeURIComponent(escape(text))).join('&'),
+        );
+      } catch (error) {
+        if (error instanceof HttpError) {
+          // Google answers automated-traffic blocks with a redirect to its CAPTCHA page.
+          if (error.status >= 300 && error.status < 400) error.rateLimited = error.temporary = true;
+          // Some Google front ends reject large form bodies that others accept.
+          if (error.status === 405 || error.status === 413) error.temporary = true;
+        }
+        throw error;
+      }
+      // Each text yields [translation, detected language]; a lone text may come back unwrapped.
+      const items = texts.length === 1 && typeof data?.[0] === 'string' ? [data] : data;
+      if (!Array.isArray(items) || items.length !== texts.length) throw new InvalidResponseError();
+      return items.map((item) => {
+        const translated = typeof item === 'string' ? item : Array.isArray(item) ? item[0] : null;
+        if (typeof translated !== 'string') throw new InvalidResponseError();
+        return translated;
+      });
     },
   });
 }

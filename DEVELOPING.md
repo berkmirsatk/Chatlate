@@ -31,7 +31,7 @@ Translation text is user data: never log it or send it to the distribution servi
 
 ## Add a provider
 
-Implement `Provider` from `src/provider.js`, register it in `src/index.js`, add its stable ID to `identity.js` and declare only its required fetch host. Reuse `createQueuedProvider` for caching, spacing, cancellation and cooldowns. Preserve the complete fragment contract: reject missing or changed separators with `InvalidResponseError` instead of applying partial translations, so the next enabled service can retry. Use `batchSize`/`batchLimit` when the service bounds request size by encoded bytes. Add request, cancellation, quota and formatting regression coverage.
+Implement `Provider` from `src/provider.js`, register it in `src/index.js`, add its stable ID to `identity.js` and declare only its required fetch host. Reuse `createQueuedProvider` for caching, spacing, cancellation and cooldowns. Preserve the complete fragment contract: reject missing or changed separators with `InvalidResponseError` instead of applying partial translations, so the next enabled service can retry. Use `batchSize`/`batchLimit` when the service bounds request size by encoded bytes. Set `detectsEachText` only when the service detects every text's language separately; otherwise batches keep to one detected language or writing system. Add request, cancellation, quota and formatting regression coverage.
 
 ## Add a language
 

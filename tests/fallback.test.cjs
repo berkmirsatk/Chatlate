@@ -1,6 +1,7 @@
 const assert = require('node:assert/strict');
 const { test } = require('node:test');
 const {
+  googleReply,
   code,
   harness,
   summaryValue,
@@ -89,7 +90,7 @@ test('Yandex quota falls back to Google without changing the selected provider',
   const h = harness({ fallback: '["google","yandex"]', provider: 'yandex' }, async (url) => {
     calls.push(new URL(url).hostname);
     if (url.includes('yandex')) return { ok: false, status: 429 };
-    return ok([[['Merhaba']]]);
+    return googleReply(['Merhaba']);
   });
   assert.equal((await runWith(h, 'yandex', [{ text: 'Hello' }]))[0].text, 'Merhaba');
   assert.deepEqual(calls, ['translate.yandex.net', 'translate.googleapis.com']);
@@ -169,13 +170,13 @@ test('connection test checks each enabled service directly after a failed primar
   assert.equal(rows.find((row) => row.id === 'test').text, 'Bağlantıyı test et');
 });
 
-test('invalid formatting never triggers backup; changed Google separators do', async () => {
+test('invalid formatting never triggers backup; a malformed Google reply does', async () => {
   const hosts = [];
   const h = harness({ fallback: '["google","yandex"]' }, async (url, options) => {
     hosts.push(new URL(url).hostname);
     if (url.includes('yandex'))
       return ok({ code: 200, text: new URLSearchParams(options.body).getAll('text') });
-    return ok([[['broken separators']]]);
+    return ok([['only one', 'en']]);
   });
   await assert.rejects(
     run(h, [{ text: 'Hello', entities: [{ _: 'messageEntityBold', offset: 0, length: 99 }] }]),
@@ -203,7 +204,7 @@ test('one timed-out fallback subscriber does not abort another shared primary re
       started();
       await gate;
       assert.equal(options.signal.aborted, false);
-      return ok([[['Birincil']]]);
+      return googleReply(['Birincil']);
     },
     'en',
     {},

@@ -1,6 +1,6 @@
 const assert = require('node:assert/strict');
 const { test } = require('node:test');
-const { code, harness, ok, run, replyWith } = require('./helpers/plugin-runtime.cjs');
+const { googleReply, code, harness, ok, run, replyWith } = require('./helpers/plugin-runtime.cjs');
 
 test('nested formatting, protected code, URL and custom emoji survive changed lengths', async () => {
   const input = {
@@ -63,7 +63,7 @@ test('protected-only messages make no network request', async () => {
 
 test('invalid provider responses are rejected', async () => {
   for (const text of ['', 'unexpected\nline']) {
-    const h = harness({}, async () => ok([[[text]]]));
+    const h = harness({}, async () => googleReply([text]));
     await assert.rejects(run(h, [{ text: 'Hello' }]), /Invalid translation/);
   }
 });
