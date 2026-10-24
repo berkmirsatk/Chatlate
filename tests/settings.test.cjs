@@ -18,8 +18,8 @@ const { dragRuntime, nativeOrderPage } = require('./helpers/native-runtime.cjs')
 test('Chatlate registers keyless providers and defaults to English', () => {
   const h = harness();
   assert.equal(h.registered.size, 2);
-  assert.equal(h.registered.get('multi.google-free').name, 'Google');
-  assert.equal(h.registered.get('multi.google-free').format, 'entities');
+  assert.equal(h.registered.get('chatlate.google').name, 'Google');
+  assert.equal(h.registered.get('chatlate.google').format, 'entities');
   assert.equal(h.page.title, 'Chatlate');
   const language = h.page.items().find((row) => row.id === 'language');
   assert.equal(language.text, 'Language');
@@ -40,8 +40,7 @@ test('language selection updates the UI and errors and survives reload', async (
     /Geçersiz mesaj/,
   );
   const reloaded = harness({
-    language: h.storage.get('multi-translate.language'),
-    'settings-version': '3',
+    language: h.storage.get('chatlate.language'),
   });
   assert.equal(reloaded.page.items().find((row) => row.id === 'language').selected, 1);
   h.page
@@ -54,22 +53,6 @@ test('language selection updates the UI and errors and survives reload', async (
 test('unsupported saved language falls back to English', () => {
   const h = harness({ language: 'de' });
   assert.equal(h.page.items().find((row) => row.id === 'language').text, 'Language');
-});
-
-test('upgrade removes obsolete configuration and preserves language and cooldown', () => {
-  const until = String(Date.now() + 60000);
-  const h = harness({
-    language: 'tr',
-    'google-free.blockedUntil': until,
-    'obsolete.key': 'remove',
-    'obsolete.option': 'remove',
-    'settings-version': '2',
-  });
-  assert.equal(h.storage.has('multi-translate.obsolete.key'), false);
-  assert.equal(h.storage.has('multi-translate.obsolete.option'), false);
-  assert.equal(h.storage.get('multi-translate.language'), 'tr');
-  assert.equal(h.storage.get('multi-translate.google-free.blockedUntil'), until);
-  assert.equal(h.storage.get('multi-translate.settings-version'), '7');
 });
 
 test('connection test reports success in the selected language', async () => {
@@ -235,7 +218,7 @@ test('native connection statuses share one box and preserve individual themed co
       android: { nativeView: (view) => ({ native: view }) },
     };
     const h = harness(
-      outcomes.length > 1 ? { fallback: '1' } : {},
+      outcomes.length > 1 ? { fallback: '["google","yandex"]' } : {},
       async (url) => {
         const index = url.includes('yandex') ? 1 : 0;
         if (!outcomes[index]) throw Error('offline');
@@ -305,19 +288,8 @@ test('inline provider selection persists and connection test uses it without a p
   assert.ok(h.page.items().some((row) => String(row.text).includes('Connection successful')));
 });
 
-test('upgrade removes DeepL state and preserves the selected supported provider', () => {
-  const h = harness({
-    'settings-version': '3',
-    'deepl-free.blockedUntil': '12345',
-    provider: 'yandex-free',
-  });
-  assert.equal(h.storage.has('multi-translate.deepl-free.blockedUntil'), false);
-  assert.equal(h.storage.get('multi-translate.provider'), 'yandex-free');
-  assert.equal(h.registered.has('multi.deepl-free'), false);
-});
-
 test('native provider selection synchronizes the active installation and respects other providers', () => {
-  let value = 'installation-123:multi.google-free';
+  let value = 'installation-123:chatlate.google';
   const config = {
     call(method, arg) {
       if (method === 'getValue') return value;
@@ -340,18 +312,15 @@ test('native provider selection synchronizes the active installation and respect
   };
   const h = harness({}, undefined, 'en', native);
   chooseProvider(h, 1);
-  assert.equal(value, 'installation-123:multi.yandex-free');
-  value = 'installation-123:multi.google-free';
+  assert.equal(value, 'installation-123:chatlate.yandex');
+  value = 'installation-123:chatlate.google';
   assert.equal(summaryValue(h), '1. Google → 2. Yandex');
   value = 'another-plugin:unrelated';
   chooseProvider(h, 1);
   assert.equal(value, 'another-plugin:unrelated');
   value = '';
   chooseProvider(h, 0);
-  assert.equal(value, 'installation-123:multi.google-free');
-  value = 'installation-123:multi.deepl-free';
-  harness({}, undefined, 'en', native);
-  assert.equal(value, 'installation-123:multi.google-free');
+  assert.equal(value, 'installation-123:chatlate.google');
 });
 
 test('description hooks affect only Chatlate, follow plugin language and dispose on unload', () => {
@@ -417,7 +386,7 @@ test('description hooks affect only Chatlate, follow plugin language and dispose
 });
 
 test('provider sync supports direct Kotlin fields and verifies the actual app value', () => {
-  let value = 'real-installation:multi.google-free';
+  let value = 'real-installation:chatlate.google';
   const config = {
     call(method, arg) {
       if (method === 'getValue') return value;
@@ -445,15 +414,15 @@ test('provider sync supports direct Kotlin fields and verifies the actual app va
   const row = h.page.items().find((row) => row.id === 'provider');
   assert.equal(row.text, 'Translation provider');
   chooseProvider(h, 1);
-  assert.equal(value, 'real-installation:multi.yandex-free');
+  assert.equal(value, 'real-installation:chatlate.yandex');
   assert.equal(summaryValue(h), '1. Yandex');
-  assert.equal(h.storage.get('multi-translate.provider'), 'yandex-free');
+  assert.equal(h.storage.get('chatlate.provider'), 'yandex');
 });
 
 test('failed provider writes retain the real selection and show a synchronization error', () => {
   const config = {
     call(method) {
-      if (method === 'getValue') return 'real-installation:multi.google-free';
+      if (method === 'getValue') return 'real-installation:chatlate.google';
       if (method === 'setValue') return;
       throw Error(method);
     },
@@ -469,7 +438,7 @@ test('failed provider writes retain the real selection and show a synchronizatio
   const h = harness({}, undefined, 'en', native);
   chooseProvider(h, 1);
   assert.equal(summaryValue(h), '1. Google → 2. Yandex');
-  assert.equal(h.storage.has('multi-translate.provider'), false);
+  assert.equal(h.storage.has('chatlate.provider'), false);
   assert.ok(h.page.items().some((row) => String(row.text).includes('Could not update Inugram')));
 });
 
@@ -504,18 +473,16 @@ test('fresh install activates Google from Telegram using the persisted installat
     },
   };
   const h = harness({}, undefined, 'en', native);
-  assert.equal(value, install + ':multi.google-free');
+  assert.equal(value, install + ':chatlate.google');
   assert.equal(summaryValue(h), '1. Google');
   value = '';
-  const saved = Object.fromEntries(
-    [...h.storage].map(([k, v]) => [k.replace('multi-translate.', ''), v]),
-  );
+  const saved = Object.fromEntries([...h.storage].map(([k, v]) => [k.replace('chatlate.', ''), v]));
   harness(saved, undefined, 'en', native);
-  assert.equal(value, install + ':multi.google-free');
+  assert.equal(value, install + ':chatlate.google');
   chooseProvider(h, 0);
-  assert.equal(value, install + ':multi.google-free');
+  assert.equal(value, install + ':chatlate.google');
   chooseProvider(h, 1);
-  assert.equal(value, install + ':multi.yandex-free');
+  assert.equal(value, install + ':chatlate.yandex');
 });
 
 test('resumed plugin screens refresh descriptions after the resume hook has returned', () => {
@@ -596,7 +563,7 @@ test('resumed plugin screens refresh descriptions after the resume hook has retu
 });
 
 test('external provider changes do not display the previous provider connection result', async () => {
-  let value = 'installation-123:multi.google-free';
+  let value = 'installation-123:chatlate.google';
   const config = {
     call(method, arg) {
       if (method === 'getValue') return value;
@@ -626,7 +593,7 @@ test('external provider changes do not display the previous provider connection 
       .items()
       .some((row) => new RegExp('^Google: Connection successful\\. · [0-9]+ ms$').test(row.text)),
   );
-  value = 'installation-123:multi.yandex-free';
+  value = 'installation-123:chatlate.yandex';
   assert.equal(summaryValue(h), '1. Yandex');
   assert.ok(
     h.page.items().every((row) => !/^Google: Connection successful\. · [0-9]+ ms$/.test(row.text)),
@@ -640,39 +607,25 @@ test('provider priorities expand on the main page with localized controls', () =
   assert.equal(h.opened, undefined);
   orderAction(h, 'Ekle: Yandex');
   assert.equal(summaryValue(h), '1. Google → 2. Yandex');
-  assert.equal(h.storage.get('multi-translate.fallback'), '["google-free","yandex-free"]');
-  const reloaded = harness({ fallback: '["google-free","yandex-free"]', 'settings-version': '7' });
+  assert.equal(h.storage.get('chatlate.fallback'), '["google","yandex"]');
+  const reloaded = harness({ fallback: '["google","yandex"]' });
   assert.equal(summaryValue(reloaded), '1. Google → 2. Yandex');
   orderAction(h, 'Kaldır: Yandex');
   assert.equal(summaryValue(h), '1. Google');
 });
 
 test('changing primary provider swaps order and never retries the primary twice', async () => {
-  const h = harness({ fallback: 'yandex-free' }, async (url) =>
+  const h = harness({ fallback: '["google","yandex"]' }, async (url) =>
     url.includes('yandex') ? { ok: false, status: 503 } : ok([[['Merhaba']]]),
   );
   chooseProvider(h, 1);
   assert.equal(summaryValue(h), '1. Yandex → 2. Google');
   assert.equal(summaryValue(h), '1. Yandex → 2. Google');
-  assert.equal((await runWith(h, 'yandex-free', [{ text: 'Hello' }]))[0].text, 'Merhaba');
-});
-
-test('migration converts old backup choices and removes unsupported IDs', () => {
-  for (const [provider, backup] of [
-    ['google-free', 'yandex-free'],
-    ['yandex-free', 'google-free'],
-  ]) {
-    const h = harness({ provider, fallback: '1', 'settings-version': '5' });
-    assert.deepEqual(JSON.parse(h.storage.get('multi-translate.fallback')), [provider, backup]);
-  }
-  for (const fallback of ['0', 'deepl-free', 'unknown']) {
-    const h = harness({ fallback, 'settings-version': '6' });
-    assert.equal(summaryValue(h), '1. Google');
-  }
+  assert.equal((await runWith(h, 'yandex', [{ text: 'Hello' }]))[0].text, 'Merhaba');
 });
 
 test('moving a provider changes native selection and saves the complete priority order', () => {
-  let value = 'real-installation:multi.google-free';
+  let value = 'real-installation:chatlate.google';
   const config = {
     call(method, arg) {
       if (method === 'getValue') return value;
@@ -691,19 +644,19 @@ test('moving a provider changes native selection and saves the complete priority
       },
     },
   };
-  const h = harness({ fallback: 'yandex-free' }, undefined, 'en', native);
+  const h = harness({ fallback: '["google","yandex"]' }, undefined, 'en', native);
   orderAction(h, 'Move up: Yandex');
-  assert.equal(value, 'real-installation:multi.yandex-free');
+  assert.equal(value, 'real-installation:chatlate.yandex');
   assert.equal(summaryValue(h), '1. Yandex → 2. Google');
-  assert.equal(h.storage.get('multi-translate.fallback'), '["yandex-free","google-free"]');
+  assert.equal(h.storage.get('chatlate.fallback'), '["yandex","google"]');
   orderAction(h, 'Move down: Yandex');
-  assert.equal(value, 'real-installation:multi.google-free');
+  assert.equal(value, 'real-installation:chatlate.google');
 });
 
 test('failed native reordering does not save a priority order that was not applied', () => {
   const config = {
     call(method) {
-      if (method === 'getValue') return 'real-installation:multi.google-free';
+      if (method === 'getValue') return 'real-installation:chatlate.google';
       if (method === 'setValue') return;
       throw Error(method);
     },
@@ -716,16 +669,16 @@ test('failed native reordering does not save a priority order that was not appli
       },
     },
   };
-  const h = harness({ fallback: 'yandex-free' }, undefined, 'en', native);
-  const before = h.storage.get('multi-translate.fallback');
+  const h = harness({ fallback: '["google","yandex"]' }, undefined, 'en', native);
+  const before = h.storage.get('chatlate.fallback');
   orderAction(h, 'Move up: Yandex');
-  assert.equal(h.storage.get('multi-translate.fallback'), before);
+  assert.equal(h.storage.get('chatlate.fallback'), before);
   assert.ok(h.page.items().some((row) => String(row.text).includes('Could not update Inugram')));
 });
 
 test('connection test follows enabled order, isolates failures and ignores repeated clicks', async () => {
   const calls = [];
-  const h = harness({ fallback: '1' }, async (url) => {
+  const h = harness({ fallback: '["google","yandex"]' }, async (url) => {
     calls.push(url.includes('yandex') ? 'Yandex' : 'Google');
     return url.includes('yandex') ? { ok: false, status: 503 } : ok([[['Merhaba']]]);
   });
@@ -747,7 +700,7 @@ test('connection test follows enabled order, isolates failures and ignores repea
 test('timing out a service still tests the next enabled provider', async () => {
   const calls = [];
   const h = harness(
-    { fallback: '1' },
+    { fallback: '["google","yandex"]' },
     async (url, options) => {
       calls.push(url.includes('yandex') ? 'Yandex' : 'Google');
       if (url.includes('yandex')) return ok({ code: 200, text: ['Merhaba'] });
@@ -777,7 +730,7 @@ test('closing settings aborts the running connection test and skips remaining se
   const began = new Promise((resolve) => {
     started = resolve;
   });
-  const h = harness({ fallback: '1' }, async (url, options) => {
+  const h = harness({ fallback: '["google","yandex"]' }, async (url, options) => {
     calls.push(url);
     signal = options.signal;
     started();
@@ -839,7 +792,7 @@ test('language flags use rounded local images in both the selected value and pop
   await new Promise((resolve) => setTimeout(resolve, 5));
   h.page.items();
   runtime.flush();
-  assert.equal(h.storage.get('multi-translate.language'), 'tr');
+  assert.equal(h.storage.get('chatlate.language'), 'tr');
   assert.equal(h.page.items().find((row) => row.native).native, root);
   assert.equal(root.children[0].values.setText, 'Dil');
   assert.equal(root.children[1].values.setText, menu.items[1][0]);
@@ -871,7 +824,7 @@ test('closing settings discards a queued language selection', async () => {
   h.page.onClose();
   runtime.flush();
   await new Promise((resolve) => setTimeout(resolve, 5));
-  assert.equal(h.storage.has('multi-translate.language'), false);
+  assert.equal(h.storage.has('chatlate.language'), false);
 });
 
 test('language popup anchors the outer settings row so Inugram clips its actual section corners', async () => {
@@ -921,22 +874,22 @@ test('enabling restores the saved provider without Use buttons and provider labe
       ? { getStaticField: (field) => (field === 'TRANSLATION_PROVIDER' ? config : metadata) }
       : originalClass(name);
   const h = harness(
-    { 'settings-version': '7', provider: 'yandex-free', fallback: '["yandex-free","google-free"]' },
+    { provider: 'yandex', fallback: '["yandex","google"]' },
     undefined,
     'en',
     runtime.native,
   );
-  assert.equal(selected, install + ':multi.yandex-free');
+  assert.equal(selected, install + ':chatlate.yandex');
   const { page, root } = await nativeOrderPage(h, runtime);
   runtime.click(root.children[0].children[1]);
-  assert.equal(selected, install + ':multi.yandex-free');
+  assert.equal(selected, install + ':chatlate.yandex');
   assert.equal(
     page.items().find((row) => row.id === 'activate'),
     undefined,
   );
   page.onClose();
   runtime.flush();
-  assert.equal(selected, install + ':multi.yandex-free');
+  assert.equal(selected, install + ':chatlate.yandex');
 });
 
 test('disable returns to Telegram after metadata changes and re-enable restores saved order', () => {
@@ -973,32 +926,30 @@ test('disable returns to Telegram after metadata changes and re-enable restores 
     },
   };
   const h = harness(
-    { provider: 'yandex-free', fallback: '["yandex-free","google-free"]' },
+    { provider: 'yandex', fallback: '["yandex","google"]' },
     undefined,
     'en',
     native,
   );
-  assert.equal(value, install + ':multi.yandex-free');
+  assert.equal(value, install + ':chatlate.yandex');
   enabled = false;
   unloaders.forEach((fn) => fn());
   assert.equal(value, '');
-  assert.equal(h.storage.get('multi-translate.provider'), 'yandex-free');
-  assert.equal(h.storage.get('multi-translate.fallback'), '["yandex-free","google-free"]');
+  assert.equal(h.storage.get('chatlate.provider'), 'yandex');
+  assert.equal(h.storage.get('chatlate.fallback'), '["yandex","google"]');
   enabled = true;
   unloaders = [];
-  const saved = Object.fromEntries(
-    [...h.storage].map(([k, v]) => [k.replace('multi-translate.', ''), v]),
-  );
+  const saved = Object.fromEntries([...h.storage].map(([k, v]) => [k.replace('chatlate.', ''), v]));
   harness(saved, undefined, 'en', native);
-  assert.equal(value, install + ':multi.yandex-free');
-  value = install + ':multi.google-free';
+  assert.equal(value, install + ':chatlate.yandex');
+  value = install + ':chatlate.google';
   unloaders.forEach((fn) => fn());
   assert.equal(value, '');
 });
 
 test('unload leaves externally selected providers alone and safely handles failed writes', () => {
   for (const external of ['', 'another-plugin:provider']) {
-    let value = 'own-install:multi.google-free',
+    let value = 'own-install:chatlate.google',
       unloaders = [];
     const config = {
       call(method, arg) {
@@ -1035,7 +986,7 @@ test('unload leaves externally selected providers alone and safely handles faile
   let rejectWrites = false;
   const config = {
     call(method, arg) {
-      if (method === 'getValue') return 'own-install:multi.google-free';
+      if (method === 'getValue') return 'own-install:chatlate.google';
       if (method === 'setValue') {
         if (rejectWrites) throw Error('Write failed');
         return;
@@ -1209,7 +1160,7 @@ test('selected description survives hook disposal without changing another plugi
 test('closing settings discards pending cooldown cells and allows a clean reopen', async () => {
   const runtime = dragRuntime(),
     h = harness(
-      { 'google-free.blockedUntil': String(Date.now() + 120000) },
+      { 'google.blockedUntil': String(Date.now() + 120000) },
       undefined,
       'en',
       runtime.native,

@@ -25,7 +25,7 @@ test('provider expansion waits for native rows without displaying temporary fall
 
 test('inline provider editor uses native dragging and persists only a completed drop', async () => {
   const runtime = dragRuntime(),
-    h = harness({ fallback: 'yandex-free' }, undefined, 'en', runtime.native);
+    h = harness({ fallback: '["google","yandex"]' }, undefined, 'en', runtime.native);
   const { page, root } = await nativeOrderPage(h, runtime);
   assert.equal(page.title, 'Chatlate');
   assert.equal(page.transient, undefined);
@@ -38,12 +38,12 @@ test('inline provider editor uses native dragging and persists only a completed 
   assert.equal(root.children[0].values.setTranslationY, 56);
   assert.equal(root.values.setClipChildren, true);
   assert.equal(root.children[1].values.setAlpha, undefined);
-  assert.equal(runtime.value, 'drag-installation:multi.google-free');
+  assert.equal(runtime.value, 'drag-installation:chatlate.google');
   runtime.event(root, 3, 0);
   runtime.event(root, 4, 0);
   await new Promise((resolve) => setTimeout(resolve, 5));
-  assert.equal(runtime.value, 'drag-installation:multi.yandex-free');
-  assert.equal(h.storage.get('multi-translate.fallback'), '["yandex-free","google-free"]');
+  assert.equal(runtime.value, 'drag-installation:chatlate.yandex');
+  assert.equal(h.storage.get('chatlate.fallback'), '["yandex","google"]');
   assert.equal(summaryValue(h), '1. Yandex → 2. Google');
   page.onClose();
   runtime.flush();
@@ -56,54 +56,51 @@ test('inline provider editor uses native dragging and persists only a completed 
 
 test('cancelled native dragging restores visual order and does not save changes', async () => {
   const runtime = dragRuntime(),
-    h = harness({ fallback: 'yandex-free' }, undefined, 'en', runtime.native);
+    h = harness({ fallback: '["google","yandex"]' }, undefined, 'en', runtime.native);
   const { page, root } = await nativeOrderPage(h, runtime);
-  const before = h.storage.get('multi-translate.fallback');
+  const before = h.storage.get('chatlate.fallback');
   runtime.drag(root, 1);
   runtime.flush();
   runtime.event(root, 2, 0);
   runtime.event(root, 4, 0);
   await new Promise((resolve) => setTimeout(resolve, 5));
-  assert.equal(root.children[0].values.setTag, 'google-free');
-  assert.equal(h.storage.get('multi-translate.fallback'), before);
+  assert.equal(root.children[0].values.setTag, 'google');
+  assert.equal(h.storage.get('chatlate.fallback'), before);
   page.onClose();
   runtime.flush();
 });
 
 test('failed native primary change rejects a dropped order and restores the saved selection', async () => {
   const runtime = dragRuntime(false),
-    h = harness({ fallback: 'yandex-free' }, undefined, 'en', runtime.native);
+    h = harness({ fallback: '["google","yandex"]' }, undefined, 'en', runtime.native);
   const { page, root } = await nativeOrderPage(h, runtime);
-  const before = h.storage.get('multi-translate.fallback');
+  const before = h.storage.get('chatlate.fallback');
   runtime.drag(root, 1);
   runtime.flush();
   runtime.event(root, 3, 0);
   runtime.event(root, 4, 0);
   await new Promise((resolve) => setTimeout(resolve, 5));
-  assert.equal(h.storage.get('multi-translate.fallback'), before);
+  assert.equal(h.storage.get('chatlate.fallback'), before);
   assert.ok(page.items().some((row) => String(row.text).includes('Could not update Inugram')));
   runtime.flush();
   await new Promise((resolve) => setTimeout(resolve, 5));
-  assert.equal(
-    page.items().find((row) => row.native).native.children[0].values.setTag,
-    'google-free',
-  );
+  assert.equal(page.items().find((row) => row.native).native.children[0].values.setTag, 'google');
   page.onClose();
   runtime.flush();
 });
 
 test('closing an order page prevents queued drops or native builds from changing settings', async () => {
   const runtime = dragRuntime(),
-    h = harness({ fallback: 'yandex-free' }, undefined, 'en', runtime.native);
+    h = harness({ fallback: '["google","yandex"]' }, undefined, 'en', runtime.native);
   const { page, root } = await nativeOrderPage(h, runtime);
-  const before = h.storage.get('multi-translate.fallback');
+  const before = h.storage.get('chatlate.fallback');
   runtime.drag(root, 1);
   runtime.flush();
   runtime.event(root, 3, 0);
   page.onClose();
   runtime.flush();
   await new Promise((resolve) => setTimeout(resolve, 5));
-  assert.equal(h.storage.get('multi-translate.fallback'), before);
+  assert.equal(h.storage.get('chatlate.fallback'), before);
   const another = openOrder(h);
   another.items();
   another.onClose();
@@ -113,7 +110,7 @@ test('closing an order page prevents queued drops or native builds from changing
 
 test('listener classes are reused across repeated opens rather than exhausting the engine class limit', async () => {
   const runtime = dragRuntime(),
-    h = harness({ fallback: 'yandex-free' }, undefined, 'en', runtime.native);
+    h = harness({ fallback: '["google","yandex"]' }, undefined, 'en', runtime.native);
   for (let index = 0; index < 4; index++) {
     const { page } = await nativeOrderPage(h, runtime);
     page.onClose();
@@ -124,7 +121,7 @@ test('listener classes are reused across repeated opens rather than exhausting t
 
 test('completed reorder preserves the native group and preserves rows during the summary refresh', async () => {
   const runtime = dragRuntime(),
-    h = harness({ fallback: 'yandex-free' }, undefined, 'en', runtime.native);
+    h = harness({ fallback: '["google","yandex"]' }, undefined, 'en', runtime.native);
   const { page, root } = await nativeOrderPage(h, runtime);
   const rows = [...root.children],
     refreshes = page.invalidations;
@@ -142,7 +139,7 @@ test('completed reorder preserves the native group and preserves rows during the
   runtime.event(root, 3, 0);
   await new Promise((resolve) => setTimeout(resolve, 5));
   runtime.flush();
-  assert.equal(runtime.value, 'drag-installation:multi.google-free');
+  assert.equal(runtime.value, 'drag-installation:chatlate.google');
   assert.equal(page.items().find((row) => row.native).native, root);
   page.onClose();
   runtime.flush();
@@ -150,7 +147,7 @@ test('completed reorder preserves the native group and preserves rows during the
 
 test('inline icons disable and re-enable providers without separate remove buttons or rebuilt views', async () => {
   const runtime = dragRuntime(),
-    h = harness({ fallback: 'yandex-free' }, undefined, 'en', runtime.native);
+    h = harness({ fallback: '["google","yandex"]' }, undefined, 'en', runtime.native);
   const { page, root } = await nativeOrderPage(h, runtime);
   assert.ok(
     page.items().every((row) => !row.id?.startsWith('remove.') && !row.id?.startsWith('add.')),
@@ -160,18 +157,18 @@ test('inline icons disable and re-enable providers without separate remove butto
   runtime.click(icon);
   await new Promise((resolve) => setTimeout(resolve, 5));
   runtime.flush();
-  assert.equal(h.storage.get('multi-translate.fallback'), '["google-free"]');
+  assert.equal(h.storage.get('chatlate.fallback'), '["google"]');
   assert.equal(toggleSymbol(icon), '⊕');
   assert.equal(icon.values.setContentDescription, 'Enable Yandex');
   assert.equal(page.items().find((row) => row.native).native, root);
   assert.equal(root.children[0].children[2].values.setEnabled, false);
   runtime.click(root.children[0].children[2]);
   await new Promise((resolve) => setTimeout(resolve, 5));
-  assert.equal(h.storage.get('multi-translate.fallback'), '["google-free"]');
+  assert.equal(h.storage.get('chatlate.fallback'), '["google"]');
   runtime.click(icon);
   await new Promise((resolve) => setTimeout(resolve, 5));
   runtime.flush();
-  assert.equal(h.storage.get('multi-translate.fallback'), '["google-free","yandex-free"]');
+  assert.equal(h.storage.get('chatlate.fallback'), '["google","yandex"]');
   assert.equal(toggleSymbol(icon), '⊖');
   assert.equal(page.items().find((row) => row.native).native, root);
   page.onClose();
@@ -181,18 +178,18 @@ test('inline icons disable and re-enable providers without separate remove butto
 test('disabling the primary promotes the next provider only after the native write succeeds', async () => {
   for (const writeSucceeds of [true, false]) {
     const runtime = dragRuntime(writeSucceeds),
-      h = harness({ fallback: 'yandex-free' }, undefined, 'en', runtime.native);
+      h = harness({ fallback: '["google","yandex"]' }, undefined, 'en', runtime.native);
     const { page, root } = await nativeOrderPage(h, runtime);
-    const before = h.storage.get('multi-translate.fallback');
+    const before = h.storage.get('chatlate.fallback');
     runtime.click(root.children[0].children[2]);
     await new Promise((resolve) => setTimeout(resolve, 5));
     runtime.flush();
     if (writeSucceeds) {
-      assert.equal(runtime.value, 'drag-installation:multi.yandex-free');
-      assert.equal(h.storage.get('multi-translate.fallback'), '["yandex-free"]');
+      assert.equal(runtime.value, 'drag-installation:chatlate.yandex');
+      assert.equal(h.storage.get('chatlate.fallback'), '["yandex"]');
       assert.equal(toggleSymbol(root.children[0].children[2]), '⊕');
     } else {
-      assert.equal(h.storage.get('multi-translate.fallback'), before);
+      assert.equal(h.storage.get('chatlate.fallback'), before);
       assert.ok(page.items().some((row) => String(row.text).includes('Could not update Inugram')));
     }
     assert.equal(page.items().find((row) => row.native).native, root);
@@ -204,9 +201,14 @@ test('disabling the primary promotes the next provider only after the native wri
 test('provider label taps and small finger movements never change selection or priority', async () => {
   for (const backup of [false, true]) {
     const runtime = dragRuntime(),
-      h = harness(backup ? { fallback: '1' } : {}, undefined, 'en', runtime.native);
+      h = harness(
+        backup ? { fallback: '["google","yandex"]' } : {},
+        undefined,
+        'en',
+        runtime.native,
+      );
     const { page, root } = await nativeOrderPage(h, runtime);
-    const before = h.storage.get('multi-translate.fallback');
+    const before = h.storage.get('chatlate.fallback');
     const label = root.children[1].children[1];
     assert.equal(label.values.setOnClickListener, undefined);
     assert.equal(label.values.setClickable, false);
@@ -215,8 +217,8 @@ test('provider label taps and small finger movements never change selection or p
     runtime.event(root, 3, 60);
     await new Promise((resolve) => setTimeout(resolve, 5));
     runtime.flush();
-    assert.equal(runtime.value, 'drag-installation:multi.google-free');
-    assert.equal(h.storage.get('multi-translate.fallback'), before);
+    assert.equal(runtime.value, 'drag-installation:chatlate.google');
+    assert.equal(h.storage.get('chatlate.fallback'), before);
     assert.equal(page.items().find((row) => row.native).native, root);
     page.onClose();
     runtime.flush();
@@ -225,9 +227,9 @@ test('provider label taps and small finger movements never change selection or p
 
 test('collapsing the provider section discards a queued completed drop', async () => {
   const runtime = dragRuntime(),
-    h = harness({ fallback: '1' }, undefined, 'en', runtime.native);
+    h = harness({ fallback: '["google","yandex"]' }, undefined, 'en', runtime.native);
   const { root } = await nativeOrderPage(h, runtime);
-  const before = h.storage.get('multi-translate.fallback');
+  const before = h.storage.get('chatlate.fallback');
   runtime.drag(root, 1);
   runtime.event(root, 3, 0);
   h.page
@@ -236,8 +238,8 @@ test('collapsing the provider section discards a queued completed drop', async (
     .onClick();
   runtime.flush();
   await new Promise((resolve) => setTimeout(resolve, 5));
-  assert.equal(runtime.value, 'drag-installation:multi.google-free');
-  assert.equal(h.storage.get('multi-translate.fallback'), before);
+  assert.equal(runtime.value, 'drag-installation:chatlate.google');
+  assert.equal(h.storage.get('chatlate.fallback'), before);
   assert.ok(h.page.items().every((row) => !row.native));
   assert.equal(h.opened, undefined);
 });
@@ -261,7 +263,7 @@ test('changing language refreshes expanded native icon labels', async () => {
 
 test('custom icons stay centered and consistent while left handles drag and labels remain inert', async () => {
   const runtime = dragRuntime(true, true),
-    h = harness({ fallback: 'yandex-free' }, undefined, 'en', runtime.native);
+    h = harness({ fallback: '["google","yandex"]' }, undefined, 'en', runtime.native);
   h.page.items();
   runtime.flush();
   await new Promise((resolve) => setTimeout(resolve, 5));
@@ -295,7 +297,7 @@ test('custom icons stay centered and consistent while left handles drag and labe
   runtime.flush();
   h.page.items();
   runtime.flush();
-  assert.equal(runtime.value, 'drag-installation:multi.yandex-free');
+  assert.equal(runtime.value, 'drag-installation:chatlate.yandex');
   assert.equal(arrow.values.setRotation, 180);
   runtime.click(group.children[0].children[2]);
   await new Promise((resolve) => setTimeout(resolve, 5));
@@ -315,7 +317,7 @@ test('custom icons stay centered and consistent while left handles drag and labe
 
 test('settings refreshes preserve an active drag and its pending drop', async () => {
   const runtime = dragRuntime(),
-    h = harness({ fallback: 'yandex-free' }, undefined, 'en', runtime.native);
+    h = harness({ fallback: '["google","yandex"]' }, undefined, 'en', runtime.native);
   const { page, root } = await nativeOrderPage(h, runtime);
   runtime.drag(root, 1);
   runtime.event(root, 2, 0);
@@ -328,8 +330,8 @@ test('settings refreshes preserve an active drag and its pending drop', async ()
   runtime.flush();
   await new Promise((resolve) => setTimeout(resolve, 5));
   runtime.flush();
-  assert.equal(runtime.value, 'drag-installation:multi.yandex-free');
-  assert.equal(h.storage.get('multi-translate.fallback'), '["yandex-free","google-free"]');
+  assert.equal(runtime.value, 'drag-installation:chatlate.yandex');
+  assert.equal(h.storage.get('chatlate.fallback'), '["yandex","google"]');
   page.onClose();
   runtime.flush();
 });

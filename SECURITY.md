@@ -6,7 +6,7 @@ This document describes Chatlate 1.0.0's intended scope. Automated tests use sim
 
 Inugram supplies the text selected for translation. Unprotected fragments and the target language go over HTTPS to Google or Yandex. Enabled backups may receive the same fragments when earlier services fail. Text travels in request bodies, not URLs. Providers may retain requests under their own policies; plugin requests do not use Inugram's proxy.
 
-There is no telemetry or persistent message archive. Translation caches are bounded and memory-only. Local preferences store language, provider order, migration state, cooldowns and a pending update version. Chatlate does not read clipboard contents or request arbitrary filesystem access.
+There is no telemetry or persistent message archive. Translation caches are bounded and memory-only. Local preferences store language, provider order, cooldowns and a pending update version. Chatlate does not read clipboard contents or request arbitrary filesystem access.
 
 - Translation requests use fixed hosts, encoded parameters and disabled redirects. Response text is not executed or interpreted as message formatting.
 - Source entities and UTF-16 boundaries are validated. Protected spans and rebuilt offsets come from the source, not the provider response.

@@ -5,7 +5,6 @@
  * Source and license: https://github.com/berkmirsatk/Chatlate
  */
 import { registeredProviderId } from './identity.js';
-import { migrateSettings } from './storage.js';
 import { createYandexProvider } from './providers/yandex.js';
 import { createGoogleProvider } from './providers/google.js';
 import { withFallback } from './fallback.js';
@@ -17,7 +16,6 @@ import { t } from './i18n.js';
 if (typeof inu.registerTranslationProvider !== 'function') {
   inu.ui.toast(t('updateRequired'));
 } else {
-  migrateSettings();
   const providers = [createGoogleProvider(), createYandexProvider()];
   for (const provider of providers) {
     const translator = createTranslator(withFallback(provider, providers));

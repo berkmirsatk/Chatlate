@@ -67,7 +67,7 @@ export function createGoogleProvider() {
     return translated.map((row) => row[0]).join('');
   }
   return createQueuedProvider({
-    id: 'google-free',
+    id: 'google',
     name: 'Google',
     batchSize: (text) => encodeURIComponent(text).length,
     batchLimit: MAX_ENCODED_BATCH,

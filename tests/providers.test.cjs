@@ -40,9 +40,9 @@ test('Google 429 respects Retry-After, stops requests across chats, and persists
   await assert.rejects(run(h, [{ text: 'Hello' }]), /Translation service.*429.*120/);
   await assert.rejects(run(h, [{ text: 'Different message' }]), /Translation service.*429/);
   assert.equal(calls, 1);
-  const until = h.storage.get('multi-translate.google-free.blockedUntil');
+  const until = h.storage.get('chatlate.google.blockedUntil');
   assert.ok(Number(until) > Date.now() + 110000);
-  const reloaded = harness({ 'google-free.blockedUntil': until });
+  const reloaded = harness({ 'google.blockedUntil': until });
   await assert.rejects(run(reloaded, [{ text: 'Reloaded' }]), /Translation service.*429/);
 });
 
@@ -58,7 +58,7 @@ test('Google serializes different target-language batches with minimum spacing',
     active--;
     return ok([[[googleText(options)]]]);
   });
-  const p = h.registered.get('multi.google-free');
+  const p = h.registered.get('chatlate.google');
   await Promise.all(
     ['tr', 'de'].map((to) =>
       p.translate({
@@ -167,24 +167,24 @@ test('Google batches stay within an encoded size limit for non-Latin text', asyn
 
 test('Google CAPTCHA redirects start a cooldown and use the backup service', async () => {
   const hosts = [];
-  const h = harness({ fallback: '1' }, async (url) => {
+  const h = harness({ fallback: '["google","yandex"]' }, async (url) => {
     hosts.push(new URL(url).hostname);
     if (url.includes('yandex')) return ok({ code: 200, text: ['Merhaba'] });
     return { ok: false, status: 302, headers: { get: () => '' } };
   });
   assert.equal((await run(h, [{ text: 'Hello' }]))[0].text, 'Merhaba');
   assert.deepEqual(hosts, ['translate.googleapis.com', 'translate.yandex.net']);
-  assert.ok(Number(h.storage.get('multi-translate.google-free.blockedUntil')) > Date.now());
+  assert.ok(Number(h.storage.get('chatlate.google.blockedUntil')) > Date.now());
 });
 
 test('batches never mix detected source languages', async () => {
   const batches = [];
-  const h = harness({ provider: 'yandex-free' }, async (url, options) => {
+  const h = harness({ provider: 'yandex' }, async (url, options) => {
     const texts = new URLSearchParams(options.body).getAll('text');
     batches.push(texts);
     return ok({ code: 200, text: texts.map((text) => text.toUpperCase()) });
   });
-  const p = h.registered.get('multi.yandex-free');
+  const p = h.registered.get('chatlate.yandex');
   const translate = (text, from) =>
     p.translate({
       texts: [{ text }],
@@ -211,7 +211,7 @@ test('Yandex receives supported codes for regional Chinese targets', async () =>
     return ok({ code: 200, text: ['你好'] });
   });
   for (const to of ['zh-CN', 'zh-TW', 'pt-BR'])
-    await runWith(h, 'yandex-free', [{ text: 'Hello ' + to }], to);
+    await runWith(h, 'yandex', [{ text: 'Hello ' + to }], to);
   assert.deepEqual(langs, ['zh', 'zh', 'pt-BR']);
 });
 
@@ -250,7 +250,7 @@ test('Yandex batches fragments with form encoding and preserves Telegram entitie
     assert.deepEqual(new URLSearchParams(options.body).getAll('text'), ['Hello', 'world']);
     return ok({ code: 200, text: ['Merhaba', 'dünya'] });
   });
-  const result = await runWith(h, 'yandex-free', [
+  const result = await runWith(h, 'yandex', [
     {
       text: 'Hello world https://example.com',
       entities: [
@@ -263,7 +263,7 @@ test('Yandex batches fragments with form encoding and preserves Telegram entitie
   assert.equal(result[0].entities[0].length, 7);
   assert.equal(result[0].entities[1].offset, 14);
   assert.equal(calls, 1);
-  await runWith(h, 'yandex-free', [{ text: 'world' }]);
+  await runWith(h, 'yandex', [{ text: 'world' }]);
   assert.equal(calls, 1);
 });
 
@@ -271,8 +271,8 @@ test('provider cooldowns are independent and persisted', async () => {
   const h = harness({}, async (url) =>
     url.includes('yandex') ? ok({ code: 429 }) : ok([[['Merhaba']]]),
   );
-  await assert.rejects(runWith(h, 'yandex-free', [{ text: 'Hello' }]), /429/);
-  assert.ok(Number(h.storage.get('multi-translate.yandex-free.blockedUntil')) > Date.now());
+  await assert.rejects(runWith(h, 'yandex', [{ text: 'Hello' }]), /429/);
+  assert.ok(Number(h.storage.get('chatlate.yandex.blockedUntil')) > Date.now());
   assert.equal((await run(h, [{ text: 'Hello' }]))[0].text, 'Merhaba');
 });
 
@@ -305,7 +305,7 @@ test('malformed Google rows and excessive translated batches are rejected', asyn
     ok({ code: 200, text: ['a'.repeat(50000), 'b'.repeat(50000), 'c'.repeat(50000)] }),
   );
   await assert.rejects(
-    runWith(h, 'yandex-free', [
+    runWith(h, 'yandex', [
       {
         text: 'Hello world again',
         entities: [
@@ -320,7 +320,7 @@ test('malformed Google rows and excessive translated batches are rejected', asyn
 
 test('HTTP redirects are disabled and do not send source text to a new host', async () => {
   const hosts = [];
-  const h = harness({ fallback: '1' }, async (url, options) => {
+  const h = harness({ fallback: '["google","yandex"]' }, async (url, options) => {
     hosts.push(new URL(url).hostname);
     assert.equal(options.redirect, 'manual');
     return { ok: false, status: 302, headers: { get: () => 'https://untrusted.example/' } };
@@ -336,9 +336,7 @@ test('untrusted Retry-After and saved cooldowns cannot disable a provider indefi
     headers: { get: () => '9999999999999999999999999' },
   }));
   await assert.rejects(run(h, [{ text: 'Hello' }]), /429/);
-  assert.ok(
-    Number(h.storage.get('multi-translate.google-free.blockedUntil')) <= Date.now() + 900000,
-  );
-  const reloaded = harness({ 'google-free.blockedUntil': 'Infinity' }, replyWith(['Merhaba']));
+  assert.ok(Number(h.storage.get('chatlate.google.blockedUntil')) <= Date.now() + 900000);
+  const reloaded = harness({ 'google.blockedUntil': 'Infinity' }, replyWith(['Merhaba']));
   assert.equal((await run(reloaded, [{ text: 'Hello' }]))[0].text, 'Merhaba');
 });

@@ -12,7 +12,7 @@ export function yandexLanguage(language) {
 /** @returns {import('../provider.js').Provider} */
 export function createYandexProvider() {
   return createQueuedProvider({
-    id: 'yandex-free',
+    id: 'yandex',
     name: 'Yandex',
     async fetchParts(texts, to, signal) {
       // The public Android translation endpoint accepts repeated text fields.

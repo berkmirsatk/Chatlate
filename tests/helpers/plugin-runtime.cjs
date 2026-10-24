@@ -13,7 +13,7 @@ function harness(
   timers = {},
 ) {
   const registered = new Map(),
-    storage = new Map(Object.entries(values).map(([k, v]) => ['multi-translate.' + k, v]));
+    storage = new Map(Object.entries(values).map(([k, v]) => ['chatlate.' + k, v]));
   let page, opened;
   const ui = {
     ...native.ui,
@@ -132,7 +132,7 @@ const ok = (data) => ({ ok: true, json: async () => data });
 const googleText = (options) => new URLSearchParams(options?.body ?? '').get('q');
 const run = (h, texts, signal = new AbortController().signal) =>
   h.registered
-    .get('multi.google-free')
+    .get('chatlate.google')
     .translate({ texts, to: 'tr', from: texts.map(() => 'en'), signal });
 function replyWith(translations, inspect = () => {}) {
   return async (url, options) => {
@@ -151,7 +151,7 @@ function replyWith(translations, inspect = () => {}) {
 }
 
 const runWith = (h, id, texts, to = 'tr', signal = new AbortController().signal) =>
-  h.registered.get('multi.' + id).translate({ texts, to, from: texts.map(() => 'en'), signal });
+  h.registered.get('chatlate.' + id).translate({ texts, to, from: texts.map(() => 'en'), signal });
 
 module.exports = {
   googleText,

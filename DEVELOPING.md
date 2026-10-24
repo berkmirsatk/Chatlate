@@ -24,10 +24,10 @@ Run `npm run format` after editing code. The installer preserves indentation and
 | `settings.js`, native view modules | Settings composition, language controls, dragging and status |
 | `updates/` | Release checks, package verification, native import, notes and completion |
 | `distribution.js`, `identity.js` | Repository configuration and stable plugin identities |
-| `i18n.js`, `language-catalog.js`, `storage.js` | Language selection, preferences and migration |
+| `i18n.js`, `language-catalog.js`, `storage.js` | Language selection and preferences |
 | `tests/helpers/` | Shared plugin sandbox and native UI fixtures |
 
-Translation text is user data: never log it or send it to the distribution service. Keep the plugin ID, `multi.*` provider IDs and `multi-translate.*` preference keys stable. Some internal names predate Chatlate and are migration contracts.
+Translation text is user data: never log it or send it to the distribution service. Keep the plugin ID, `chatlate.*` provider IDs and `chatlate.*` preference keys stable after release: renaming them resets users' selections and settings.
 
 ## Add a provider
 

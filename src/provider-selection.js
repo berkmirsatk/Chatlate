@@ -43,14 +43,14 @@ export function createProviderSelection(providers) {
     }
     const separator = key.lastIndexOf(':');
     const id = separator < 0 ? '' : key.slice(separator + 1);
-    const legacyIndex = providers.findIndex((provider) => registeredProviderId(provider.id) === id);
-    if (!prefix && (legacyIndex >= 0 || id === 'multi.deepl-free'))
+    // Without installation metadata, learn the prefix from our own selected provider key.
+    if (!prefix && providers.some((provider) => registeredProviderId(provider.id) === id))
       prefix = key.slice(0, separator + 1);
     if (prefix) installationPrefix = prefix;
     const index = prefix
       ? providers.findIndex((provider) => prefix + registeredProviderId(provider.id) === key)
       : -1;
-    return { config, index, retired: !!prefix && key === prefix + 'multi.deepl-free', prefix };
+    return { config, index, prefix };
   }
   function apply(state, index) {
     const desired = state.prefix + registeredProviderId(providers[index].id);
@@ -69,8 +69,8 @@ export function createProviderSelection(providers) {
     try {
       const state = nativeState();
       // Leave another plugin or Telegram alone if the user switched providers.
-      if (state.index < 0 && !state.retired) return;
-      if (state.index >= 0) put('provider', providers[state.index].id);
+      if (state.index < 0) return;
+      put('provider', providers[state.index].id);
       // Inugram uses an empty provider key for its built-in Telegram service.
       state.config.call('setValue', '');
     } catch {

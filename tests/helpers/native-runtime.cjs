@@ -59,7 +59,7 @@ function dragRuntime(
   languageFlags = false,
   attachedSelector = false,
 ) {
-  let value = 'drag-installation:multi.google-free',
+  let value = 'drag-installation:chatlate.google',
     onUi = false,
     definitions = 0;
   const queue = [],
