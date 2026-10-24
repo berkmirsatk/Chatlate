@@ -1,6 +1,7 @@
 const assert = require('node:assert/strict');
 const { test } = require('node:test');
 const {
+  googleReply,
   code,
   harness,
   summaryValue,
@@ -222,7 +223,9 @@ test('native connection statuses share one box and preserve individual themed co
       async (url) => {
         const index = url.includes('yandex') ? 1 : 0;
         if (!outcomes[index]) throw Error('offline');
-        return url.includes('yandex') ? ok({ code: 200, text: ['Merhaba'] }) : ok([[['Merhaba']]]);
+        return url.includes('yandex')
+          ? ok({ code: 200, text: ['Merhaba'] })
+          : googleReply(['Merhaba']);
       },
       'en',
       native,
@@ -616,7 +619,7 @@ test('provider priorities expand on the main page with localized controls', () =
 
 test('changing primary provider swaps order and never retries the primary twice', async () => {
   const h = harness({ fallback: '["google","yandex"]' }, async (url) =>
-    url.includes('yandex') ? { ok: false, status: 503 } : ok([[['Merhaba']]]),
+    url.includes('yandex') ? { ok: false, status: 503 } : googleReply(['Merhaba']),
   );
   chooseProvider(h, 1);
   assert.equal(summaryValue(h), '1. Yandex → 2. Google');
@@ -680,7 +683,7 @@ test('connection test follows enabled order, isolates failures and ignores repea
   const calls = [];
   const h = harness({ fallback: '["google","yandex"]' }, async (url) => {
     calls.push(url.includes('yandex') ? 'Yandex' : 'Google');
-    return url.includes('yandex') ? { ok: false, status: 503 } : ok([[['Merhaba']]]);
+    return url.includes('yandex') ? { ok: false, status: 503 } : googleReply(['Merhaba']);
   });
   chooseProvider(h, 1);
   const button = h.page.items().find((row) => row.id === 'test');

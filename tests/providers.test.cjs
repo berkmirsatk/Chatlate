@@ -1,8 +1,10 @@
 const assert = require('node:assert/strict');
 const { test } = require('node:test');
 const {
+  googleReply,
   code,
   googleText,
+  googleTexts,
   harness,
   ok,
   run,
@@ -11,24 +13,25 @@ const {
 } = require('./helpers/plugin-runtime.cjs');
 
 test('Google batches formatting fragments and repeated text into one HTTP request', async () => {
-  let calls = 0;
+  const batches = [];
   const h = harness({}, async (url, options) => {
-    calls++;
-    const q = googleText(options);
-    assert.match(q, /⟦900000:0⟧/);
-    return ok([[[q.replaceAll('Hello', 'Merhaba').replaceAll('world', 'dünya')]]]);
+    const texts = googleTexts(options);
+    batches.push(texts);
+    return googleReply(
+      texts.map((q) => q.replaceAll('Hello', 'Merhaba').replaceAll('world', 'dünya')),
+    );
   });
   const a = run(h, [
     { text: 'Hello world', entities: [{ _: 'messageEntityBold', offset: 0, length: 5 }] },
   ]);
   const b = run(h, [{ text: 'Hello' }]);
   const [first, second] = await Promise.all([a, b]);
-  assert.equal(calls, 1);
+  assert.deepEqual(batches, [['Hello', 'world']]);
   assert.equal(first[0].text, 'Merhaba dünya');
   assert.equal(first[0].entities[0].length, 7);
   assert.equal(second[0].text, 'Merhaba');
   await run(h, [{ text: 'world' }]);
-  assert.equal(calls, 1);
+  assert.equal(batches.length, 1);
 });
 
 test('Google 429 respects Retry-After, stops requests across chats, and persists cooldown', async () => {
@@ -56,7 +59,7 @@ test('Google serializes different target-language batches with minimum spacing',
     maxActive = Math.max(maxActive, active);
     await new Promise((r) => setTimeout(r, 20));
     active--;
-    return ok([[[googleText(options)]]]);
+    return googleReply([googleText(options)]);
   });
   const p = h.registered.get('chatlate.google');
   await Promise.all(
@@ -74,17 +77,28 @@ test('Google serializes different target-language batches with minimum spacing',
   assert.ok(starts[1] - starts[0] >= 1750);
 });
 
-test('Google rejects corrupted batch markers without falling back to per-fragment requests', async () => {
-  let calls = 0;
-  const h = harness({}, async () => {
-    calls++;
-    return ok([[['broken merged text']]]);
-  });
-  await assert.rejects(
-    run(h, [{ text: 'Hello world', entities: [{ _: 'messageEntityBold', offset: 0, length: 5 }] }]),
-    /separators/,
-  );
-  assert.equal(calls, 1);
+test('Google rejects a reply that does not match the requested texts', async () => {
+  for (const reply of [
+    [['only one', 'en']],
+    [
+      ['one', 'en'],
+      [null, 'en'],
+    ],
+    { error: true },
+  ]) {
+    let calls = 0;
+    const h = harness({}, async () => {
+      calls++;
+      return ok(reply);
+    });
+    await assert.rejects(
+      run(h, [
+        { text: 'Hello world', entities: [{ _: 'messageEntityBold', offset: 0, length: 5 }] },
+      ]),
+      /Invalid translation response/,
+    );
+    assert.equal(calls, 1);
+  }
 });
 
 test('cancelling one Google subscriber keeps the shared request alive for another', async () => {
@@ -95,7 +109,7 @@ test('cancelling one Google subscriber keeps the shared request alive for anothe
     started();
     await gate;
     assert.equal(opts.signal.aborted, false);
-    return ok([[['merhaba']]]);
+    return googleReply(['merhaba']);
   });
   const controller = new AbortController();
   const first = run(h, [{ text: 'Hello' }], controller.signal);
@@ -117,46 +131,36 @@ test('Google cancellation before dispatch sends no HTTP request', async () => {
   await new Promise((r) => setTimeout(r, 80));
 });
 
-test('Google posts text in the form body and requests only translations', async () => {
+test('Google posts each text as an escaped form field and detects its language separately', async () => {
   const h = harness({}, async (url, opts) => {
     const u = new URL(url);
     assert.equal(u.hostname, 'translate.googleapis.com');
+    assert.equal(u.pathname, '/translate_a/t');
     assert.equal(u.searchParams.get('client'), 'gtx');
-    assert.equal(u.searchParams.get('ie'), 'UTF-8');
-    assert.deepEqual(u.searchParams.getAll('dt'), ['t']);
+    assert.equal(u.searchParams.get('sl'), 'auto');
     assert.equal(u.searchParams.get('q'), null);
     assert.equal(url.includes('Hello'), false);
     assert.equal(opts.method, 'POST');
     assert.match(opts.headers['content-type'], /^application\/x-www-form-urlencoded/);
-    assert.equal(googleText(opts), 'Hello');
+    // The endpoint reads HTML, so literal markup and entities are escaped.
+    assert.deepEqual(new URLSearchParams(opts.body).getAll('q'), ['Hello &lt;b&gt; &amp;amp;']);
     assert.match(opts.headers['User-Agent'], /Android.*Chrome.*Mobile/);
-    return ok([[['merhaba']]]);
+    return googleReply(['merhaba <b> &amp;']);
   });
-  assert.equal((await run(h, [{ text: 'Hello' }]))[0].text, 'merhaba');
+  assert.equal((await run(h, [{ text: 'Hello <b> &amp;' }]))[0].text, 'merhaba <b> &amp;');
 });
 
-test('Google romanization rows for non-Latin text are ignored', async () => {
-  const h = harness({}, async () =>
-    ok([
-      [
-        ['Merhaba dünya. ', 'Привет мир. ', null, null, 10],
-        ['Nasılsın?', 'Как дела?', null, null, 10],
-        [null, null, null, 'Privet mir. Kak dela?'],
-      ],
-      null,
-      'ru',
-    ]),
-  );
-  const [result] = await run(h, [{ text: 'Привет мир. Как дела?' }]);
-  assert.equal(result.text, 'Merhaba dünya. Nasılsın?');
+test('Google accepts a lone reply without the outer list', async () => {
+  const h = harness({}, async () => ok(['Merhaba dünya', 'ru']));
+  const [result] = await run(h, [{ text: 'Привет мир' }]);
+  assert.equal(result.text, 'Merhaba dünya');
 });
 
 test('Google batches stay within an encoded size limit for non-Latin text', async () => {
   const bodies = [];
   const h = harness({}, async (url, options) => {
     bodies.push(options.body.length);
-    const q = googleText(options);
-    return ok([[[q]]]);
+    return googleReply(googleTexts(options));
   });
   const message = 'Привет мир, как у тебя дела сегодня? '.repeat(25).trim();
   const results = await Promise.all([1, 2, 3].map((n) => run(h, [{ text: message + ' ' + n }])));
@@ -215,6 +219,41 @@ test('batches never mix detected source languages', async () => {
     ['ПРИВЕТ', 'HELLO', 'ПОКА'],
   );
   assert.deepEqual(batches, [['Привет', 'Пока'], ['Hello']]);
+});
+
+test('Google sends mixed languages together; Yandex batches unknown languages by writing system', async () => {
+  const texts = [
+    'Did anyone watch the stream?',
+    '你看了这个吗 有没有省流',
+    'I think the update is great',
+    'これを見ましたか',
+  ];
+  const batches = { google: [], yandex: [] };
+  const h = harness({}, async (url, options) => {
+    if (url.includes('yandex')) {
+      const sent = new URLSearchParams(options.body).getAll('text');
+      batches.yandex.push(sent);
+      return ok({ code: 200, text: sent });
+    }
+    const sent = googleTexts(options);
+    batches.google.push(sent);
+    return googleReply(sent);
+  });
+  for (const id of ['google', 'yandex']) {
+    const p = h.registered.get('chatlate.' + id);
+    await Promise.all(
+      texts.map((text) =>
+        p.translate({
+          texts: [{ text }],
+          to: 'tr',
+          from: [null],
+          signal: new AbortController().signal,
+        }),
+      ),
+    );
+  }
+  assert.deepEqual(batches.google, [texts]);
+  assert.deepEqual(batches.yandex, [[texts[0], texts[2]], [texts[1]], [texts[3]]]);
 });
 
 test('Yandex receives supported codes for regional Chinese targets', async () => {
@@ -282,7 +321,7 @@ test('Yandex batches fragments with form encoding and preserves Telegram entitie
 
 test('provider cooldowns are independent and persisted', async () => {
   const h = harness({}, async (url) =>
-    url.includes('yandex') ? ok({ code: 429 }) : ok([[['Merhaba']]]),
+    url.includes('yandex') ? ok({ code: 429 }) : googleReply(['Merhaba']),
   );
   await assert.rejects(runWith(h, 'yandex', [{ text: 'Hello' }]), /429/);
   assert.ok(Number(h.storage.get('chatlate.yandex.blockedUntil')) > Date.now());

@@ -9,11 +9,39 @@ const MIN_REQUEST_INTERVAL_MS = 1800;
 const BATCH_MAX_CHARS = 3500;
 const MAX_QUEUE_ENTRIES = 200;
 const COLLECTION_WINDOW_MS = 60;
+/** @type {[string, RegExp][]} */
+const SCRIPTS = [
+  ['han', /\p{Script=Han}/gu],
+  ['hangul', /\p{Script=Hangul}/gu],
+  ['cyrillic', /\p{Script=Cyrillic}/gu],
+  ['arabic', /\p{Script=Arabic}/gu],
+  ['hebrew', /\p{Script=Hebrew}/gu],
+  ['greek', /\p{Script=Greek}/gu],
+  ['thai', /\p{Script=Thai}/gu],
+  ['devanagari', /\p{Script=Devanagari}/gu],
+  ['latin', /\p{Script=Latin}/gu],
+];
+
+/** The dominant writing system, so text of unknown language is not batched with another script.
+ * @param {string} text */
+function writingSystem(text) {
+  // Japanese mixes kana with Han characters.
+  if (/[\p{Script=Hiragana}\p{Script=Katakana}]/u.test(text)) return 'kana';
+  let best = 'other',
+    count = 0;
+  for (const [name, pattern] of SCRIPTS) {
+    const found = text.match(pattern)?.length ?? 0;
+    if (found > count) [best, count] = [name, found];
+  }
+  return best;
+}
 
 /**
  * Shared bounded queue, fragment caching, cancellation and persisted rate-limit cooldown.
  * `batchSize` measures a fragment against `batchLimit` when a service bounds its request size.
- * @param {{id: string, name: string, fetchParts: (texts: string[], to: string, signal: AbortSignal) => Promise<string[]>, batchSize?: (text: string) => number, batchLimit?: number}} config
+ * Services that detect one language per request keep each batch to one language or script;
+ * `detectsEachText` lifts that for services that detect every text separately.
+ * @param {{id: string, name: string, fetchParts: (texts: string[], to: string, signal: AbortSignal) => Promise<string[]>, batchSize?: (text: string) => number, batchLimit?: number, detectsEachText?: boolean}} config
  * @returns {import('../provider.js').Provider}
  */
 export function createQueuedProvider({
@@ -22,6 +50,7 @@ export function createQueuedProvider({
   fetchParts,
   batchSize = (text) => text.length,
   batchLimit = BATCH_MAX_CHARS,
+  detectsEachText = false,
 }) {
   // One shared queue across all chats and the connection-test button.
   const cache = createCache((value) => value.length);
@@ -57,7 +86,7 @@ export function createQueuedProvider({
         if (delay > 0) await new Promise((resolve) => setTimeout(() => resolve(undefined), delay));
         const entries = [];
         let to = '',
-          from = null,
+          group = '',
           size = 0;
         for (const entry of pending.values()) {
           if (!entry.waiters.size) {
@@ -65,11 +94,11 @@ export function createQueuedProvider({
             continue;
           }
           // Services detect one source language per request, so keep each batch to one.
-          if (entries.length && (entry.to !== to || entry.from !== from)) continue;
+          if (entries.length && (entry.to !== to || entry.group !== group)) continue;
           if (entries.length && size + batchSize(entry.text) + 40 > batchLimit) break;
           entries.push(entry);
           to = entry.to;
-          from = entry.from;
+          group = entry.group;
           size += batchSize(entry.text) + 40;
           if (entries.length >= 40) break;
         }
@@ -123,7 +152,13 @@ export function createQueuedProvider({
     let entry = pending.get(key);
     if (!entry) {
       if (pending.size >= MAX_QUEUE_ENTRIES) return Promise.reject(new Error(t('queueFull')));
-      entry = { key, text, to, from, waiters: new Set(), cancelBatch: null };
+      // The app often sends no detected language; then group by writing system instead.
+      const group = detectsEachText
+        ? ''
+        : from
+          ? 'language:' + from
+          : 'script:' + writingSystem(text);
+      entry = { key, text, to, group, waiters: new Set(), cancelBatch: null };
       pending.set(key, entry);
     }
     const promise = new Promise((resolve, reject) => {

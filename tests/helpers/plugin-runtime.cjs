@@ -128,25 +128,24 @@ async function waitUntil(predicate) {
   }
 }
 const ok = (data) => ({ ok: true, json: async () => data });
-/** Google receives its source text in the form body. */
-const googleText = (options) => new URLSearchParams(options?.body ?? '').get('q');
+/** Google receives each source text as an HTML-escaped `q` form field. */
+const googleTexts = (options) =>
+  new URLSearchParams(options?.body ?? '')
+    .getAll('q')
+    .map((q) => q.replaceAll('&lt;', '<').replaceAll('&gt;', '>').replaceAll('&amp;', '&'));
+const googleText = (options) => googleTexts(options)[0];
+/** Google's reply: one [translation, detected language] pair per text. */
+const googleReply = (translations) => ok(translations.map((text) => [text, 'en']));
 const run = (h, texts, signal = new AbortController().signal) =>
   h.registered
     .get('chatlate.google')
     .translate({ texts, to: 'tr', from: texts.map(() => 'en'), signal });
 function replyWith(translations, inspect = () => {}) {
   return async (url, options) => {
-    const q = googleText(options);
-    inspect(url, options, q);
-    let index = 0;
-    const result = /⟦\d+:0⟧/.test(q)
-      ? q.replace(
-          /(⟦\d+:\d+⟧)\n([\s\S]*?)\n(?=⟦\d+:\d+⟧)/g,
-          (_, marker) => marker + '\n' + translations[index++] + '\n',
-        )
-      : translations[index++];
-    assert.equal(index, translations.length);
-    return ok([[[result]]]);
+    const texts = googleTexts(options);
+    inspect(url, options, texts.join('\n'));
+    assert.equal(texts.length, translations.length);
+    return googleReply(translations);
   };
 }
 
@@ -155,6 +154,8 @@ const runWith = (h, id, texts, to = 'tr', signal = new AbortController().signal)
 
 module.exports = {
   googleText,
+  googleTexts,
+  googleReply,
   fs,
   vm,
   assert,

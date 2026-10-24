@@ -13,7 +13,7 @@ There is no telemetry or persistent message archive. Translation caches are boun
 - Input, output, queues and caches are bounded. Body-size validation occurs after reading a response, not as a streaming limit.
 - Each provider serializes requests and isolates shared-subscriber cancellation. HTTP 429 cooldowns persist and are capped at 15 minutes.
 - Fallback visits eligible services once within a shared budget. Connection failures, rate limits (including Google's CAPTCHA redirect), temporary HTTP errors and malformed responses move to the next service; cancellation, invalid source formatting and permanent HTTP errors stop the chain.
-- Requests group fragments by the app-detected source language, so one request never mixes languages.
+- Google detects the language of each text in a request. For Yandex, which detects one language per request, fragments are grouped by the app-detected language or, when unknown, by writing system.
 - Stored priorities accept registered IDs only. Native provider changes are read back before saving; unload resets Chatlate's active selection to Telegram and leaves external providers alone.
 
 ## Native UI and community links
