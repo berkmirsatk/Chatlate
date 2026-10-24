@@ -22,6 +22,7 @@
 - **Google, Yandex and Microsoft** – use any of them, drag them into your preferred order, and let the next one take over within seconds if a service is unavailable. A short note in the chat tells you when it does.
 - **Switch in the chat** – pick another service from the translate bar's menu.
 - **Descriptions in place** – group, channel and profile descriptions are translated right where they are.
+- **Original below** – with Inugram's Show original text setting on, whole-chat translations keep the original under them too.
 - **Connection test** – see each service's status and response time.
 - **Built-in updates** – new versions and the version history appear in Chatlate's settings, with release notes you can translate.
 - **English and Turkish** – the interface follows Inugram's language.
