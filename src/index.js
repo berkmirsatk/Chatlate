@@ -15,10 +15,12 @@ import { registerDescription } from './description.js';
 import { registerSettings } from './settings.js';
 import { createProviderSelection } from './provider-selection.js';
 import { registerChatMenu } from './chat-menu.js';
+import { registerProfileTranslation } from './profile-translation.js';
 
 const providers = [createGoogleProvider(), createYandexProvider(), createMicrosoftProvider()];
 const selection = createProviderSelection(providers);
 const chatMenu = registerChatMenu(providers, selection);
+registerProfileTranslation(providers, selection);
 for (const provider of providers) {
   const translator = createTranslator(withFallback(provider, providers));
   inu.registerTranslationProvider({

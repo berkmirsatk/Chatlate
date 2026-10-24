@@ -10,6 +10,7 @@
 ### Translation
 
 - When a service does not answer, the next one takes over within seconds, and a short note in the chat says so.
+- Group, channel and profile descriptions translate in place instead of in a popup.
 
 ### Settings
 

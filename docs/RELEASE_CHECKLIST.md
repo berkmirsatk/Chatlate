@@ -10,6 +10,7 @@ Run these checks on the final installation file. HTTP/JVM fixtures cannot verify
 - [ ] Enable all services, drag priorities and toggle individual services. Label taps do not reorder; the last service stays enabled.
 - [ ] Connection tests report enabled services in order with separate status and timing. Closing settings cancels the test.
 - [ ] A naturally unavailable primary uses its enabled backup without permanently promoting it. Do not flood a provider to trigger a failure. With airplane mode toggled mid-translation or a blocked host, the note appears above the translate bar (below pinned messages) for a few seconds, once.
+- [ ] Long-press a group, channel and user description and tap Translate: it changes in place, links and usernames stay, and Translate again restores it. With Telegram's own service selected, the popup still opens.
 - [ ] Translate bar menu: **Translation service** sits under **Translate to**, marks the active service, opens and returns from its list; picking another one retranslates the chat with it.
 - [ ] Version history and update notes: with a non-English app language, a translate icon sits in the top-right corner of the header. It translates the notes into that language and turns blue; tapping it again shows the original. The back button still works.
 - [ ] Disable Chatlate while selected: Telegram becomes active. Re-enable/restart: saved language, provider order and preferences return. External provider selections remain untouched.
