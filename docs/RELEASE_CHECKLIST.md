@@ -19,8 +19,7 @@ Run these checks on the final installation file. HTTP/JVM fixtures cannot verify
 
 ## Real update path
 
-- [ ] While the repository is private or has no public Release, no update banner appears and translations still work.
-- [ ] After publication, test with a genuine older installation and a newer stable Release: two bright pulses, release-specific GitHub link and Markdown notes.
+- [ ] Test with a genuine older installation and the newer stable Release: two bright pulses, release-specific GitHub link and Markdown notes.
 - [ ] Returning without installing resets the strip's brightness. Closing during download cancels without a false success notification.
 - [ ] The downloaded package opens Inugram's native confirmation flow, including permission changes. Cancelling leaves the current installation working.
 - [ ] Confirming reloads the new version, preserves preferences and produces completion feedback once. Reopen version history after updating.
@@ -28,10 +27,9 @@ Run these checks on the final installation file. HTTP/JVM fixtures cannot verify
 ## Publish
 
 - [ ] Keep `PLUGIN_VERSION`, package and lockfile versions equal; retain the plugin, provider and preference identities.
-- [ ] Add the version section to `CHANGELOG.md`; keep previous sections. Verify generated GitHub and Telegram notes use that same text.
-- [ ] Run `npm ci` and `npm run package` on the finished source. Review the staged file list; exclude credentials, dependencies, generated installers and demo files.
-- [ ] Create tag `vVERSION` from the reviewed commit and attach `dist/Chatlate-VERSION.inu.js` and `dist/Chatlate-VERSION.sha256` to its Release. The exact installer name is required by the updater.
-- [ ] Check the uploaded asset's SHA-256 and GitHub digest. Source archives include the GNU GPLv3 license and lockfile; source ZIPs are not installers.
-- [ ] Keep the repository private until the agreed public launch. Anonymous update checks and online release notes become available only after public publication.
+- [ ] Add the version section to `CHANGELOG.md`; keep previous sections. Send a **Telegram private preview** with **development** to read the notes as the channel will show them.
+- [ ] Merge the reviewed changes into `main`, then run **Actions → Prepare release**. It runs every check, builds the installer and uploads it with its checksum to a draft Release.
+- [ ] Review the draft's notes and assets, then publish it as the latest release. Plumgins Bot announces it in `@Plumgins` automatically; check its **Sync Telegram changelogs** run and the channel post.
+- [ ] Install from the channel post or the Release once, and confirm the in-app update banner on an older installation.
 
-Use 1.0.1 for fixes, 1.1.0 for compatible features/providers and 2.0.0 for incompatible changes. The first public version is 1.0.0. Do not uninstall a development installation merely to change its version; updating preserves settings.
+Use 1.0.1 for fixes, 1.1.0 for compatible features/providers and 2.0.0 for incompatible changes. Do not uninstall a development installation merely to change its version; updating preserves settings.
