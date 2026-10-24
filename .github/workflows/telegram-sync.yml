@@ -3,6 +3,9 @@ on:
   push:
     branches: [main]
     paths: [CHANGELOG.md]
+  # Publishing a Release announces it in the channel.
+  release:
+    types: [published]
   workflow_dispatch:
 
 permissions:
@@ -14,11 +17,11 @@ concurrency:
 
 jobs:
   notify:
-    if: github.ref == 'refs/heads/main'
+    if: github.event_name == 'release' || github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     timeout-minutes: 2
     steps:
-      - name: Ask Plumgins Bot to refresh Chatlate announcements
+      - name: Ask Plumgins Bot to announce and refresh Chatlate releases
         env:
           GH_TOKEN: ${{ secrets.PLUMGINS_GITHUB_TOKEN }}
         run: |
