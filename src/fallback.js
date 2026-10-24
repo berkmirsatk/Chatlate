@@ -72,7 +72,6 @@ async function attempt(provider, texts, to, signal, budget, from = undefined) {
 export function withFallback(primary, providers) {
   return {
     ...primary,
-    cacheContext: () => JSON.stringify(getProviderOrder(primary, providers).map((item) => item.id)),
     async translateParts(texts, to, signal, from = undefined) {
       const order = getProviderOrder(primary, providers);
       if (order.length === 1) return primary.translateParts(texts, to, signal, from);

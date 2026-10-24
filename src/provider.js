@@ -5,7 +5,6 @@
  * @property {string} name Name displayed in the application's provider picker.
  * @property {(texts: readonly string[], to: string, signal: AbortSignal, from?: readonly (string | null)[]) => Promise<string[]>} translateParts
  *   `from` holds the app-detected source language of each text, or null when unknown.
- * @property {(() => string)=} cacheContext
  * @property {(() => void)=} clearCache
  * @property {(() => string)=} cooldownMessage
  */

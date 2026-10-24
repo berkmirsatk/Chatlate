@@ -7,10 +7,9 @@ const MAX_METADATA_CHARS = 128000;
 export const MAX_PACKAGE_BYTES = 512 * 1024;
 
 /** A public, unauthenticated release source. Private or unpublished repos return no update.
- * @param {string | null} repository
- * @returns {import('./index.js').ReleaseSource | null} */
+ * @param {string} repository
+ * @returns {import('./index.js').ReleaseSource} */
 export function createGitHubSource(repository) {
-  if (!repository) return null;
   if (!/^[A-Za-z0-9-]+\/[A-Za-z0-9_.-]+$/.test(repository)) throw Error('Invalid repository');
   const api = 'https://api.github.com/repos/' + repository;
   const web = 'https://github.com/' + repository;

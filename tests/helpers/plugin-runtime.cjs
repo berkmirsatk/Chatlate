@@ -58,7 +58,7 @@ function harness(
       key: (i) => [...storage.keys()][i] ?? null,
       removeItem: (k) => storage.delete(k),
     },
-    // Translation fixtures run against an unpublished distribution repository.
+    // Translation fixtures see the distribution repository as unpublished.
     fetch: (url, options) =>
       url.startsWith('https://api.github.com/')
         ? Promise.resolve({ status: 404, ok: false })

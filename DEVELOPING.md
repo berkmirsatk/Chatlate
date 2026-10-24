@@ -51,7 +51,7 @@ Community destinations are defined in `community-links.js`. Channel/group photos
 
 ## Release distribution
 
-`REPOSITORY` in `distribution.js` points to `berkmirsatk/Chatlate`. No token is bundled. The build adds the two GitHub fetch hosts only when a repository is configured; private repositories produce no anonymous updates until publication.
+`REPOSITORY` in `distribution.js` points to `berkmirsatk/Chatlate`. No token is bundled; the manifest grants the two GitHub fetch hosts. Private repositories produce no anonymous updates until publication.
 
 Public GitHub Releases use tags `vMAJOR.MINOR.PATCH` and an asset named `Chatlate-VERSION.inu.js`. The release source reads stable published releases, requires GitHub's SHA-256 asset digest, rechecks the chosen tag on install and bounds metadata/package size. It never accepts a download URL from release text. Drafts, prereleases and private/unpublished repositories do not produce update banners.
 
