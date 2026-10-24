@@ -2,25 +2,25 @@
 
 ## 1.0.0
 
+The first release of Chatlate: chat translation for Inugram that keeps messages looking the way they were written.
+
 ### Translation
 
-- Translate messages and entire chats without Telegram Premium.
-- Preserve formatting, links, quotes and spoilers.
-- Keep code, usernames and custom emoji unchanged.
+- Translate single messages or whole chats, no Telegram Premium needed.
+- Bold, italics, links, quotes and spoilers stay in place.
+- Code, usernames and custom emoji are never changed.
+- Group chats that mix languages are translated message by message.
 
 ### Providers
 
-- Drag providers to set their priority and enable or disable them individually.
-- Automatically try the next enabled provider when a service is temporarily unavailable.
-- Test providers and view connection status and response time.
-- Translate from non-Latin scripts reliably, including group chats that mix languages.
-
-**Currently supported:** Google · Yandex
+- Use Google, Yandex or both, and drag them into your preferred order.
+- If a service is unavailable, the next one takes over automatically.
+- Test the connection to see each service's status and response time.
 
 ### Settings
 
-- Check for updates and browse release history.
-- English and Turkish interface, following Inugram’s language by default.
-- Keep provider preferences across restarts.
-- Return to Telegram translation when disabled and restore the selected provider when enabled.
-- Access community links and support options from the settings banner.
+- English and Turkish interface that follows Inugram's language.
+- Your choices are kept across restarts and updates.
+- Check for updates and read the version history in settings.
+- Turning Chatlate off returns to Telegram's translation; turning it on restores your choice.
+- Community links and support options are one tap away on the settings banner.
