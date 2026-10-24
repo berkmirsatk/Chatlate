@@ -3,7 +3,7 @@ import { request, HttpError, InvalidResponseError } from '../http.js';
 
 /** Yandex accepts base codes for regional Chinese and modern codes for legacy aliases.
  * @param {string} language */
-export function yandexLanguage(language) {
+function yandexLanguage(language) {
   const code = language.toLowerCase();
   if (code === 'zh' || code.startsWith('zh-') || code.startsWith('zh_')) return 'zh';
   return { iw: 'he', jw: 'jv', in: 'id', ji: 'yi' }[code] ?? language;

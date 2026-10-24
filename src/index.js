@@ -11,20 +11,15 @@ import { withFallback } from './fallback.js';
 import { createTranslator } from './translation.js';
 import { registerDescription } from './description.js';
 import { registerSettings } from './settings.js';
-import { t } from './i18n.js';
 
-if (typeof inu.registerTranslationProvider !== 'function') {
-  inu.ui.toast(t('updateRequired'));
-} else {
-  const providers = [createGoogleProvider(), createYandexProvider()];
-  for (const provider of providers) {
-    const translator = createTranslator(withFallback(provider, providers));
-    inu.registerTranslationProvider({
-      id: registeredProviderId(provider.id),
-      name: provider.name,
-      format: 'entities',
-      translate: (request) => translator.translate(request),
-    });
-  }
-  registerSettings(providers, registerDescription());
+const providers = [createGoogleProvider(), createYandexProvider()];
+for (const provider of providers) {
+  const translator = createTranslator(withFallback(provider, providers));
+  inu.registerTranslationProvider({
+    id: registeredProviderId(provider.id),
+    name: provider.name,
+    format: 'entities',
+    translate: (request) => translator.translate(request),
+  });
 }
+registerSettings(providers, registerDescription());

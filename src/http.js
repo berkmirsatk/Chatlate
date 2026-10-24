@@ -44,7 +44,7 @@ export async function request(url, headers, signal, body = undefined) {
       method: body === undefined ? 'GET' : 'POST',
       redirect: 'manual',
       body,
-      headers: { 'content-type': 'application/json', ...headers },
+      headers,
       signal,
       timeout: 23000,
     });

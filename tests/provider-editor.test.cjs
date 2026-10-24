@@ -256,7 +256,7 @@ test('changing language refreshes expanded native icon labels', async () => {
   runtime.flush();
   await new Promise((resolve) => setTimeout(resolve, 5));
   const root = h.page.items().find((row) => row.native).native;
-  assert.equal(root.children[1].children[2].values.setContentDescription, 'Yandex etkinleştir');
+  assert.equal(root.children[1].children[2].values.setContentDescription, 'Etkinleştir: Yandex');
   h.page.onClose();
   runtime.flush();
 });
