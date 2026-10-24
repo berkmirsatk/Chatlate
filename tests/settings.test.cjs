@@ -1179,7 +1179,7 @@ test('closing settings discards pending cooldown cells and allows a clean reopen
   runtime.flush();
   await new Promise((resolve) => setTimeout(resolve, 5));
   const status = h.page.items().find((row) => row.native)?.native;
-  assert.match(status.values.setText, /rate limit/);
+  assert.match(status.values.setText, /limiting requests/);
   h.page.onClose();
   runtime.flush();
 });

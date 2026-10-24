@@ -4,7 +4,7 @@ Run these checks on the final installation file. HTTP/JVM fixtures cannot verify
 
 ## Device checks
 
-- [ ] Fresh install: name, author, third Plumgins sticker, static banner, permissions and automatic Google selection.
+- [ ] Fresh install: name, author, icon, banner, permissions and automatic Google selection.
 - [ ] Google and Yandex translations: nested bold/italic, spoilers, quotes, link labels, code, usernames, custom emoji and line breaks.
 - [ ] Whole-chat translation without Premium, new incoming messages and excluded-language rules.
 - [ ] Enable both services, drag priorities and toggle individual services. Label taps do not reorder; the last service stays enabled.

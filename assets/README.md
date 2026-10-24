@@ -1,12 +1,8 @@
 Chatlate artwork
 
-The current plugin icon is `chatlate-icon-gradient-512.png` (512 × 512, opaque square). `chatlate-icon-gradient-512.webm` is its one-second VP9 video-sticker export with no audio. The translation symbol uses a subtle lavender-to-lilac gradient over diffuse purple, navy and plum lighting.
+- `chatlate-settings-poster.webp` (960 × 480) is the settings banner. The build bundles it into the installer; rebuild after changing it.
+- `chatlate-icon-gradient-512.png` is the plugin icon, with `chatlate-icon-gradient-512.webm` as its video-sticker export. Inugram shows the icon from the sticker set in the manifest's `icon` field (`inu.config.ts`).
+- `chatlate-banner-vibrant.png` (1280 × 640) is a wide banner export for posts and pages.
+- `buy-me-a-coffee.svg` is the official Buy Me a Coffee button logo (https://cdn.buymeacoffee.com/buttons/bmc-new-btn-logo.svg). It identifies the external support service; the trademark remains with its owner.
 
-Reference: Google Material Symbols Rounded, Translate.
-https://fonts.google.com/icons?icon.query=translate&icon.style=Rounded
-
-The manifest references the third sticker (`idx=2`) in `Plumgins`; update that sticker to change the displayed plugin icon.
-
-The static settings banner is `chatlate-settings-poster.webp` (960 × 480). The SDK bundles it directly; rebuild after changing it. `chatlate-banner-vibrant.png` is the separate 1280 × 640 export. Tapping the banner expands an inline section containing the channel and group links with their public profile photos, with a host icon fallback. Design drafts and animations are excluded from releases.
-
-The Buy Me a Coffee mark in `buy-me-a-coffee.svg` is the service's official button logo, sourced from https://cdn.buymeacoffee.com/buttons/bmc-new-btn-logo.svg. It identifies the external support service; the trademark remains with its owner. The SVG is bundled locally and follows the native row's icon tint.
+The icon is based on Google Material Symbols Rounded, Translate: https://fonts.google.com/icons?icon.query=translate&icon.style=Rounded
