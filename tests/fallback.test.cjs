@@ -13,7 +13,7 @@ const {
 test('backup provider defaults off and opt-in persists after reload', async () => {
   const h = harness({}, async () => ({ ok: false, status: 429 }));
   assert.equal(summaryValue(h), '1. Google');
-  await assert.rejects(run(h, [{ text: 'Hello' }]), /429/);
+  await assert.rejects(run(h, [{ text: 'Hello' }]), /limiting requests/);
   orderAction(h, 'Add: Yandex');
   assert.equal(h.storage.get('chatlate.fallback'), '["google","yandex"]');
   const upgraded = harness({ fallback: h.storage.get('chatlate.fallback') });
@@ -55,7 +55,7 @@ test('quota fallback retries all fragments on Yandex and preserves nested entiti
   assert.deepEqual(calls, ['translate.googleapis.com', 'translate.yandex.net']);
   // Disabling backup must not reuse a message translated by it.
   orderAction(h, 'Remove: Yandex');
-  await assert.rejects(run(h, [input]), /429/);
+  await assert.rejects(run(h, [input]), /limiting requests/);
   assert.equal(calls.length, 2);
 });
 

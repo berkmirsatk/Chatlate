@@ -39,13 +39,13 @@ test('Google 429 respects Retry-After, stops requests across chats, and persists
     calls++;
     return { ok: false, status: 429, headers: { get: () => '120' } };
   });
-  await assert.rejects(run(h, [{ text: 'Hello' }]), /Translation service.*429.*120/);
-  await assert.rejects(run(h, [{ text: 'Different message' }]), /Translation service.*429/);
+  await assert.rejects(run(h, [{ text: 'Hello' }]), /limiting requests.*120 seconds/);
+  await assert.rejects(run(h, [{ text: 'Different message' }]), /limiting requests/);
   assert.equal(calls, 1);
   const until = h.storage.get('chatlate.google.blockedUntil');
   assert.ok(Number(until) > Date.now() + 110000);
   const reloaded = harness({ 'google.blockedUntil': until });
-  await assert.rejects(run(reloaded, [{ text: 'Reloaded' }]), /Translation service.*429/);
+  await assert.rejects(run(reloaded, [{ text: 'Reloaded' }]), /limiting requests/);
 });
 
 test('Google serializes different target-language batches with minimum spacing', async () => {
@@ -322,7 +322,7 @@ test('provider cooldowns are independent and persisted', async () => {
   const h = harness({}, async (url) =>
     url.includes('yandex') ? ok({ code: 429 }) : googleReply(['Merhaba']),
   );
-  await assert.rejects(runWith(h, 'yandex', [{ text: 'Hello' }]), /429/);
+  await assert.rejects(runWith(h, 'yandex', [{ text: 'Hello' }]), /limiting requests/);
   assert.ok(Number(h.storage.get('chatlate.yandex.blockedUntil')) > Date.now());
   assert.equal((await run(h, [{ text: 'Hello' }]))[0].text, 'Merhaba');
 });
@@ -386,7 +386,7 @@ test('untrusted Retry-After and saved cooldowns cannot disable a provider indefi
     status: 429,
     headers: { get: () => '9999999999999999999999999' },
   }));
-  await assert.rejects(run(h, [{ text: 'Hello' }]), /429/);
+  await assert.rejects(run(h, [{ text: 'Hello' }]), /limiting requests/);
   assert.ok(Number(h.storage.get('chatlate.google.blockedUntil')) <= Date.now() + 900000);
   const reloaded = harness({ 'google.blockedUntil': 'Infinity' }, replyWith(['Merhaba']));
   assert.equal((await run(reloaded, [{ text: 'Hello' }]))[0].text, 'Merhaba');
