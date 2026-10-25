@@ -1,6 +1,10 @@
 import { settingsBackground, previewTextSize } from './native-style.js';
 import { createExpansionIcon, setCustomIcon } from './native-icons.js';
 
+// Gravity.LEFT or Gravity.RIGHT, each with Gravity.CENTER_VERTICAL.
+const GRAVITY_START = 19;
+const GRAVITY_END = 21;
+
 /** Native Android marquee: scroll the actual summary only when its measured width overflows. */
 export function createMarqueeRow(invalidate) {
   let state;
@@ -19,6 +23,12 @@ export function createMarqueeRow(invalidate) {
       value.call('getCompoundPaddingRight');
     const width = value.call('getPaint').call('measureText', current.summary);
     const overflow = available > 0 && width > available;
+    // Android scrolls a marquee from the text's start; right-aligned overflowing text would
+    // begin mid-way and jump back. Align it left only while it scrolls.
+    if (current.overflow !== overflow) {
+      current.overflow = overflow;
+      value.call('setGravity', overflow ? GRAVITY_START : GRAVITY_END);
+    }
     value.call('setSelected', overflow);
     value.call('setHorizontalFadingEdgeEnabled', overflow);
   }
@@ -185,7 +195,7 @@ export function createMarqueeRow(invalidate) {
                 const value = new textView(context);
                 value.call('setText', summary);
                 previewTextSize(value, utilities);
-                value.call('setGravity', 21);
+                value.call('setGravity', GRAVITY_END);
                 value.call('setSingleLine', true);
                 value.call('setEllipsize', marquee);
                 value.call('setMarqueeRepeatLimit', -1);
