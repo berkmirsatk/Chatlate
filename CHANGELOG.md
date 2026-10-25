@@ -12,6 +12,7 @@
 - When a service does not answer, the next one takes over within seconds, and a short note in the chat says so.
 - Group, channel and profile descriptions translate in place instead of in a popup.
 - Inugram's Show original text setting now also covers whole-chat translation.
+- The translate bar no longer appears for chats already in your language, and Don't translate works without Premium. Any chat can still be translated from its menu.
 
 ### Settings
 

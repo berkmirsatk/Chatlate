@@ -43,7 +43,10 @@ export function registerChatMenu(providers, selection) {
               const swipeBack = current.layout.call('getSwipeBack');
               if (tag === 'open') swipeBack.call('openForeground', current.page);
               else if (tag === 'back') swipeBack.call('closeForeground');
-              else {
+              else if (tag === 'restrict') {
+                current.popup.call('dismiss');
+                restrict(current);
+              } else {
                 current.popup.call('dismiss');
                 const id = tag;
                 // Saving the choice needs the plugin thread.
@@ -110,8 +113,69 @@ export function registerChatMenu(providers, selection) {
       item.call('setTag', 'open');
       item.call('setOnClickListener', listener);
       // Right below "Translate to".
-      layout.getField('linearLayout').call('addView', item, 1);
-      menu = { popup, layout, button, page: layout.call('addViewToSwipeBack', page) };
+      const list = layout.getField('linearLayout');
+      list.call('addView', item, 1);
+      const restricted = restrictItem(context, resources, button, drawables, listener);
+      if (restricted) list.call('addView', restricted.item, 2);
+      menu = {
+        popup,
+        layout,
+        button,
+        language: restricted?.language,
+        added: restricted?.added,
+        page: layout.call('addViewToSwipeBack', page),
+      };
+    }
+
+    /** Telegram offers "Don't translate" to Premium users only; Chatlate honours the list for everyone.
+     * @returns {{item: any, language: string, added: string} | undefined} */
+    function restrictItem(context, resources, button, drawables, listener) {
+      const account = button.getField('currentAccount');
+      if (
+        inu.jvm
+          .cls('org.telegram.messenger.UserConfig')
+          .callStatic('getInstance', account)
+          .call('isPremium')
+      )
+        return;
+      const language = inu.jvm
+        .cls('org.telegram.messenger.MessagesController')
+        .callStatic('getInstance', account)
+        .call('getTranslateController')
+        .call('getDialogDetectedLanguage', button.getField('dialogId'));
+      if (typeof language !== 'string' || !language || language === 'und') return;
+      const alert = inu.jvm.cls('org.telegram.ui.Components.TranslateAlert2');
+      const name = alert.callStatic('languageName(Ljava/lang/String;)Ljava/lang/String;', language);
+      if (typeof name !== 'string' || !name) return;
+      const strings = inu.jvm.cls('org.telegram.messenger.R$string');
+      const locale = inu.jvm.cls('org.telegram.messenger.LocaleController');
+      const text = (key) => String(locale.callStatic('getString', strings.getStaticField(key)));
+      const item = plainItem.newInstance(context, false, false, resources);
+      item.call(
+        'setTextAndIcon',
+        text('DoNotTranslateLanguageOther').replace('%s', name),
+        drawables.getStaticField('msg_block2'),
+      );
+      item.call('setTag', 'restrict');
+      item.call('setOnClickListener', listener);
+      const added = text('AddedToDoNotTranslateOther').replace('%s', name).replaceAll('**', '');
+      return { item, language, added };
+    }
+
+    /** As Telegram's own Premium action: adds the language to the list and hides the bar here. */
+    function restrict(current) {
+      if (!current.language) return;
+      const controller = inu.jvm
+        .cls('org.telegram.messenger.MessagesController')
+        .callStatic('getInstance', current.button.getField('currentAccount'))
+        .call('getTranslateController');
+      inu.jvm
+        .cls('org.telegram.ui.RestrictedLanguagesSelectActivity')
+        .callStatic('toggleLanguage', current.language, true);
+      controller.call('checkRestrictedLanguagesUpdate');
+      controller.call('setHideTranslateDialog', current.button.getField('dialogId'), true);
+      const added = current.added;
+      setTimeout(() => inu.ui.toast(added), 0);
     }
 
     /** @param {string} id @param {any} button */

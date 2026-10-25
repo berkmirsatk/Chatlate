@@ -15,10 +15,11 @@ class View {
   }
 }
 
-function chatRuntime(installed = 'installation:chatlate.google') {
+function chatRuntime(installed = 'installation:chatlate.google', premium = true) {
   let value = installed;
   const hooks = [],
     controllerCalls = [],
+    restricted = [],
     ui = [];
   const config = {
     call(method, arg) {
@@ -59,6 +60,7 @@ function chatRuntime(installed = 'installation:chatlate.google') {
     call(method, ...args) {
       controllerCalls.push([method, ...args]);
       if (method === 'isTranslatingDialog') return true;
+      if (method === 'getDialogDetectedLanguage') return 'en';
     },
   };
   const native = {
@@ -76,8 +78,12 @@ function chatRuntime(installed = 'installation:chatlate.google') {
       cls(name) {
         const statics = {
           'desu.inugram.InuConfig': { TRANSLATION_PROVIDER: config },
-          'org.telegram.messenger.R$drawable': { ic_ab_back: 1, msg_language: 2 },
-          'org.telegram.messenger.R$string': { Back: 3 },
+          'org.telegram.messenger.R$drawable': { ic_ab_back: 1, msg_language: 2, msg_block2: 4 },
+          'org.telegram.messenger.R$string': {
+            Back: 'Back',
+            DoNotTranslateLanguageOther: "Don't translate %s",
+            AddedToDoNotTranslateOther: '**%s** is added to the Do Not Translate list.',
+          },
         };
         // Views are constructed with `new`; other classes only use their statics.
         return Object.assign(
@@ -93,8 +99,13 @@ function chatRuntime(installed = 'installation:chatlate.google') {
             getDeclaredMethod: (descriptor) => descriptor,
             callStatic(method, ...args) {
               if (method === 'runOnUIThread') return args[0]();
-              if (method === 'getString') return 'Back';
-              if (method === 'getInstance') return { call: () => controller };
+              if (method === 'getString') return args[0];
+              if (method.startsWith('languageName')) return 'English';
+              if (method === 'toggleLanguage') return restricted.push(args);
+              if (method === 'getInstance')
+                return name.endsWith('UserConfig')
+                  ? { call: (call) => call === 'isPremium' && premium }
+                  : { call: () => controller };
               throw Error(name + '.' + method);
             },
           },
@@ -106,6 +117,7 @@ function chatRuntime(installed = 'installation:chatlate.google') {
     native,
     hooks,
     controllerCalls,
+    restricted,
     ui,
     linear,
     layout,
@@ -234,4 +246,31 @@ test('a backup translation shows a short note above the translate bar and remove
     ['setViewVisible', note, false, true],
     ['removeView', note],
   ]);
+});
+
+test("without Premium the menu offers Don't translate for the chat's language", async () => {
+  const runtime = chatRuntime('installation:chatlate.google', false);
+  const toasts = [];
+  const h = harness({}, undefined, 'en', runtime.native);
+  h.ui.toast = (text) => toasts.push(text);
+  runtime.open();
+  const item = runtime.linear.children[2];
+  assert.deepEqual(item.values.setTextAndIcon, ["Don't translate English", 4]);
+  assert.deepEqual(runtime.linear.children.slice(3), ['hide']);
+  click(item);
+  assert.deepEqual(runtime.ui, [['dismiss']]);
+  assert.deepEqual(runtime.restricted, [['en', true]]);
+  assert.deepEqual(
+    runtime.controllerCalls.filter(([method]) => method !== 'getDialogDetectedLanguage'),
+    [['checkRestrictedLanguagesUpdate'], ['setHideTranslateDialog', -1001, true]],
+  );
+  await new Promise((resolve) => setTimeout(resolve, 5));
+  assert.deepEqual(toasts, ['English is added to the Do Not Translate list.']);
+});
+
+test("Premium users keep Telegram's own Don't translate entry only", () => {
+  const runtime = chatRuntime();
+  harness({}, undefined, 'en', runtime.native);
+  runtime.open();
+  assert.deepEqual(runtime.linear.children.slice(2), ['hide']);
 });
