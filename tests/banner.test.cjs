@@ -106,7 +106,7 @@ test('banner strip has its own click, keeps artwork size, follows state and canc
     () => {},
     () => toggles++,
   );
-  const state = { available: true, text: 'Update available · 1.0.1', onClick: () => updates++ };
+  const state = { available: true, text: 'Update available · 9.0.1', onClick: () => updates++ };
   const flushUi = () => {
     while (ui.length) ui.shift()();
   };
@@ -165,11 +165,11 @@ test('banner strip has its own click, keeps artwork size, follows state and canc
   assert.equal(glow.values.setAlpha[0], 0);
   assert.equal(glow.values.setVisibility[0], 8);
   assert.deepEqual(arrow.values.setLayoutParams[0].values.setMargins, [0, 0, 14, 12]);
-  banner.render(true, { ...state, text: 'Güncelleme mevcut · 1.0.1' });
+  banner.render(true, { ...state, text: 'Güncelleme mevcut · 9.0.1' });
   flushUi();
   assert.equal(stripe.values.setVisibility[0], 0);
   assert.notEqual(animations.at(-1), animation);
-  assert.equal(stripe.children[2].values.setText[0], 'Güncelleme mevcut · 1.0.1');
+  assert.equal(stripe.children[2].values.setText[0], 'Güncelleme mevcut · 9.0.1');
   click(stripe);
   banner.reset();
   flushUi();

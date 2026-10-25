@@ -68,20 +68,71 @@ export function createChangelogRequest(source, invalidate) {
   };
 }
 
-/** Render only freshly downloaded release notes for one version.
+/** @typedef {{language(): string, translate(content: TextWithEntities, to: string, signal: AbortSignal): Promise<TextWithEntities>}} NotesTranslator
+ * @typedef {{available(): boolean, busy(): boolean, active(): boolean, toggle(): void}} NotesTranslation */
+
+/** Render only freshly downloaded release notes for one version, optionally translated.
  * @param {import('./index.js').ReleaseSource | null} source
- * @param {string} version @param {() => void} invalidate */
-export function createVersionNotes(source, version, invalidate) {
-  let renderer;
-  const request = createChangelogRequest(source, () => {
+ * @param {string} version @param {() => void} invalidate
+ * @param {NotesTranslator | null} translator */
+export function createVersionNotes(source, version, invalidate, translator = null) {
+  let renderer, original, translated, translating;
+  let showTranslation = false;
+  function render() {
     renderer?.dispose();
     renderer = undefined;
+    const content = showTranslation ? translated : original;
+    if (content) renderer = createChangelogText(content);
+  }
+  const request = createChangelogRequest(source, () => {
     const notes = request.entries().find((entry) => entry.version === version)?.notes.en;
-    if (notes) renderer = createChangelogText(inu.utils.md(notes));
+    original = notes ? inu.utils.md(notes) : undefined;
+    translated = undefined;
+    showTranslation = false;
+    render();
     invalidate();
   });
+  // Notes are written in English.
+  const target = () => translator?.language() ?? 'en';
+  async function translate() {
+    if (translating || !original || !translator) return;
+    const controller = new AbortController();
+    translating = controller;
+    invalidate();
+    try {
+      translated = await translator.translate(original, target(), controller.signal);
+      if (translating !== controller) return;
+      showTranslation = true;
+      render();
+    } catch (error) {
+      if (translating === controller && typeof error?.message === 'string' && error.message)
+        inu.ui.toast(error.message);
+    } finally {
+      if (translating === controller) {
+        translating = undefined;
+        invalidate();
+      }
+    }
+  }
+  /** @type {NotesTranslation} */
+  const translation = {
+    available: () => !!translator && !!original && !!renderer && target().split(/[-_]/)[0] !== 'en',
+    busy: () => !!translating,
+    active: () => showTranslation,
+    toggle() {
+      if (translating || !translation.available()) return;
+      if (!translated) {
+        void translate();
+        return;
+      }
+      showTranslation = !showTranslation;
+      render();
+      invalidate();
+    },
+  };
   return {
     load: request.load,
+    translation,
     items() {
       const status = request.statusItems();
       if (status.length) return status;
@@ -90,6 +141,8 @@ export function createVersionNotes(source, version, invalidate) {
         : [inu.ui.separator(updateMessages().missingNotes), request.retry()];
     },
     dispose() {
+      translating?.abort();
+      translating = undefined;
       request.dispose();
       renderer?.dispose();
       renderer = undefined;

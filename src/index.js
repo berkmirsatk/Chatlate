@@ -7,19 +7,34 @@
 import { registeredProviderId } from './identity.js';
 import { createYandexProvider } from './providers/yandex.js';
 import { createGoogleProvider } from './providers/google.js';
-import { withFallback } from './fallback.js';
+import { createMicrosoftProvider } from './providers/microsoft.js';
+import { onProviderSwitch, withFallback } from './fallback.js';
+import { createChatNotice } from './chat-notice.js';
 import { createTranslator } from './translation.js';
 import { registerDescription } from './description.js';
 import { registerSettings } from './settings.js';
+import { createProviderSelection } from './provider-selection.js';
+import { registerChatMenu } from './chat-menu.js';
 
-const providers = [createGoogleProvider(), createYandexProvider()];
+const providers = [createGoogleProvider(), createYandexProvider(), createMicrosoftProvider()];
+const selection = createProviderSelection(providers);
+const chatMenu = registerChatMenu(providers, selection);
 for (const provider of providers) {
   const translator = createTranslator(withFallback(provider, providers));
   inu.registerTranslationProvider({
     id: registeredProviderId(provider.id),
     name: provider.name,
     format: 'entities',
-    translate: (request) => translator.translate(request),
+    translate: (request) => {
+      // Keeps the chat menu's label in the app's current language.
+      chatMenu.refresh();
+      return translator.translate(request);
+    },
   });
 }
-registerSettings(providers, registerDescription());
+onProviderSwitch(createChatNotice());
+const refreshDescription = registerDescription();
+registerSettings(providers, selection, () => {
+  refreshDescription();
+  chatMenu.refresh();
+});

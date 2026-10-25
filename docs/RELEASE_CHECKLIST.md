@@ -5,11 +5,13 @@ Run these checks on the final installation file. HTTP/JVM fixtures cannot verify
 ## Device checks
 
 - [ ] Fresh install: name, author, icon, banner, permissions and automatic Google selection.
-- [ ] Google and Yandex translations: nested bold/italic, spoilers, quotes, link labels, code, usernames, custom emoji and line breaks.
+- [ ] Google, Yandex and Microsoft translations: nested bold/italic, spoilers, quotes, link labels, code, usernames, custom emoji and line breaks.
 - [ ] Whole-chat translation without Premium, new incoming messages and excluded-language rules.
-- [ ] Enable both services, drag priorities and toggle individual services. Label taps do not reorder; the last service stays enabled.
+- [ ] Enable all services, drag priorities and toggle individual services. Label taps do not reorder; the last service stays enabled.
 - [ ] Connection tests report enabled services in order with separate status and timing. Closing settings cancels the test.
-- [ ] A naturally unavailable primary uses its enabled backup without permanently promoting it. Do not flood a provider to trigger a failure.
+- [ ] A naturally unavailable primary uses its enabled backup without permanently promoting it. Do not flood a provider to trigger a failure. With airplane mode toggled mid-translation or a blocked host, the note appears above the translate bar (below pinned messages) for a few seconds, once.
+- [ ] Translate bar menu: **Translation service** sits under **Translate to**, marks the active service, opens and returns from its list; picking another one retranslates the chat with it.
+- [ ] Version history and update notes: with a non-English app language, a translate icon sits in the top-right corner of the header. It translates the notes into that language and turns blue; tapping it again shows the original. The back button still works.
 - [ ] Disable Chatlate while selected: Telegram becomes active. Re-enable/restart: saved language, provider order and preferences return. External provider selections remain untouched.
 - [ ] English/Turkish interface, automatic app language, manual override, disabled-plugin description and language flags.
 - [ ] Expand/collapse community links, verify current titles/photos and responsive blue previews in both screen orientations.

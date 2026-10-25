@@ -2,10 +2,12 @@ import { PLUGIN_VERSION } from '../identity.js';
 import { HISTORY_ICON } from '../community-icons.js';
 import { createChangelogRequest, createVersionNotes } from './remote-notes.js';
 import { updateMessages } from './messages.js';
+import { createNotesAction } from './notes-action.js';
 
 /** Version history is downloaded when opened; individual notes are refreshed on selection.
- * @param {import('./index.js').ReleaseSource | null} source */
-export function createReleaseHistory(source) {
+ * @param {import('./index.js').ReleaseSource | null} source
+ * @param {import('./remote-notes.js').NotesTranslator | null} translator */
+export function createReleaseHistory(source, translator = null) {
   const cleanups = new Set();
   let icon;
   try {
@@ -18,15 +20,26 @@ export function createReleaseHistory(source) {
 
   function openVersion(version) {
     let closed = false;
-    const notes = createVersionNotes(source, version, () => page.invalidate());
+    const title = 'Chatlate ' + version;
+    const notes = createVersionNotes(
+      source,
+      version,
+      () => {
+        page.invalidate();
+        translateAction.update();
+      },
+      translator,
+    );
+    const translateAction = createNotesAction(title, notes.translation);
     function close() {
       if (closed) return;
       closed = true;
+      translateAction.dispose();
       notes.dispose();
       cleanups.delete(close);
     }
     const page = inu.ui.settingsPage({
-      title: 'Chatlate ' + version,
+      title,
       transient: true,
       onClose: close,
       items: notes.items,
@@ -35,6 +48,7 @@ export function createReleaseHistory(source) {
     try {
       inu.ui.openPage(page);
       notes.load();
+      translateAction.attach();
     } catch {
       close();
       page.dispose();

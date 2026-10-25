@@ -1,5 +1,20 @@
 # Changelog
 
+## 1.1.0
+
+### Providers
+
+- Microsoft Translator joins Google and Yandex, with no key needed.
+- Switch services from the translate bar's menu in any chat.
+
+### Translation
+
+- When a service does not answer, the next one takes over within seconds, and a short note in the chat says so.
+
+### Settings
+
+- Release notes can be translated into the app's language with one tap.
+
 ## 1.0.0
 
 The first release of Chatlate: chat translation for Inugram that keeps messages looking the way they were written.

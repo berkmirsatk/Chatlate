@@ -6,6 +6,7 @@
  * @property {(texts: readonly string[], to: string, signal: AbortSignal, from?: readonly (string | null)[]) => Promise<string[]>} translateParts
  *   `from` holds the app-detected source language of each text, or null when unknown.
  * @property {(() => void)=} clearCache
+ * @property {(() => number)=} queueDelay How long a new request would wait for the service's request spacing.
  * @property {(() => string)=} cooldownMessage
  */
 export {};

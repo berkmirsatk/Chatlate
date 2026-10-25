@@ -7,6 +7,7 @@ import { celebrateUpdate } from './celebration.js';
 import { updateMessages } from './messages.js';
 import { isNewer } from './version.js';
 import { createReleaseHistory } from './history.js';
+import { createNotesAction } from './notes-action.js';
 
 /** @typedef {{version: string, notes: {en?: string, tr?: string}, url?: string}} Release
  * @typedef {{check(signal: AbortSignal): Promise<Release | null>,
@@ -15,8 +16,9 @@ import { createReleaseHistory } from './history.js';
 
 /** UI and lifecycle for releases supplied by a validating distribution adapter.
  * @param {() => void} invalidate
- * @param {ReleaseSource | null} source */
-export function createUpdates(invalidate, source = null) {
+ * @param {ReleaseSource | null} source
+ * @param {import('./remote-notes.js').NotesTranslator | null} translator */
+export function createUpdates(invalidate, source = null, translator = null) {
   /** @type {Release | null} */
   let release = null;
   let githubIcon;
@@ -27,7 +29,7 @@ export function createUpdates(invalidate, source = null) {
       githubIcon = inu.icons.common('link');
     } catch {}
   }
-  const history = createReleaseHistory(source);
+  const history = createReleaseHistory(source, translator);
   let checked = false,
     checkController,
     installController;
@@ -69,7 +71,16 @@ export function createUpdates(invalidate, source = null) {
     const selected = release;
     const installer = source;
     const text = updateMessages();
-    const notes = createVersionNotes(source, selected.version, () => page.invalidate());
+    const notes = createVersionNotes(
+      source,
+      selected.version,
+      () => {
+        page.invalidate();
+        translateAction.update();
+      },
+      translator,
+    );
+    const translateAction = createNotesAction(text.title, notes.translation);
     const releaseUrl = githubReleaseUrl(selected);
     let closed = false,
       busy = false,
@@ -77,6 +88,7 @@ export function createUpdates(invalidate, source = null) {
     function close() {
       closed = true;
       pages.delete(close);
+      translateAction.dispose();
       notes.dispose();
       pageController?.abort();
     }
@@ -147,6 +159,7 @@ export function createUpdates(invalidate, source = null) {
     try {
       inu.ui.openPage(page);
       notes.load();
+      translateAction.attach();
     } catch {
       close();
       page.dispose();
