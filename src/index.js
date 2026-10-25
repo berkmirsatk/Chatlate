@@ -7,6 +7,7 @@
 import { registeredProviderId } from './identity.js';
 import { createYandexProvider } from './providers/yandex.js';
 import { createGoogleProvider } from './providers/google.js';
+import { createDeepLProvider } from './providers/deepl.js';
 import { createMicrosoftProvider } from './providers/microsoft.js';
 import { onProviderSwitch, withFallback } from './fallback.js';
 import { createChatNotice } from './chat-notice.js';
@@ -19,7 +20,12 @@ import { registerProfileTranslation } from './profile-translation.js';
 import { registerKeepOriginal } from './keep-original.js';
 import { registerRestrictedLanguages } from './restricted-languages.js';
 
-const providers = [createGoogleProvider(), createYandexProvider(), createMicrosoftProvider()];
+const providers = [
+  createGoogleProvider(),
+  createYandexProvider(),
+  createMicrosoftProvider(),
+  createDeepLProvider(),
+];
 const selection = createProviderSelection(providers);
 const chatMenu = registerChatMenu(providers, selection);
 registerProfileTranslation(providers, selection);

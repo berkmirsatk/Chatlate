@@ -24,6 +24,7 @@ export default defineConfig({
           'fetch(translate.googleapis.com)',
           'fetch(translate.yandex.net)',
           'fetch(edge.microsoft.com)',
+          'fetch(oneshot-free.www.deepl.com)',
           'fetch(api.github.com)',
           'fetch(release-assets.githubusercontent.com)',
           'openUrl',

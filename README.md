@@ -19,7 +19,7 @@
 - **Translate anything** – single messages or whole chats, no Telegram Premium needed.
 - **Formatting stays** – bold, italics, links, quotes and spoilers keep their place; code, usernames and custom emoji are never changed.
 - **Mixed-language chats** – each message is translated from its own language.
-- **Google, Yandex and Microsoft** – use any of them, drag them into your preferred order, and let the next one take over within seconds if a service is unavailable. A short note in the chat tells you when it does.
+- **Google, Yandex, Microsoft and DeepL** – use any of them, drag them into your preferred order, and let the next one take over within seconds if a service is unavailable. A short note in the chat tells you when it does.
 - **Switch in the chat** – pick another service from the translate bar's menu.
 - **Descriptions in place** – group, channel and profile descriptions are translated right where they are.
 - **Original below** – with Inugram's Show original text setting on, whole-chat translations keep the original under them too.
@@ -36,7 +36,9 @@
 
 Requires Inugram v13.0.3-49 or later. To update, install the new version over the old one; your settings are kept.
 
-Google, Yandex and Microsoft are used through their free public endpoints, so availability and limits are up to those services.
+Google, Yandex, Microsoft and DeepL are used through their free public endpoints, so availability and limits are up to those services.
+
+DeepL is optional and uses the anonymous oneshot endpoint without an API key. Requests are limited to 1,500 UTF-16 units; oversized fragments can use an enabled backup. Rate limits temporarily pause DeepL.
 
 ## Privacy
 
