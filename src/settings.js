@@ -5,7 +5,6 @@ import { createLanguageRow } from './language-row.js';
 import { createMarqueeRow } from './marquee-row.js';
 import { createDragList } from './drag-list.js';
 import { createProviderEditor } from './provider-editor.js';
-import { createProviderSelection } from './provider-selection.js';
 import { createStatusGroup } from './status-group.js';
 import { createStatusRow } from './status-row.js';
 import { createSettingsBanner } from './settings-banner.js';
@@ -14,12 +13,17 @@ import { createDonation } from './donation.js';
 import { createAdaptivePreviews } from './adaptive-previews.js';
 import { createRainbowHeart } from './rainbow-heart.js';
 import { createUpdates } from './updates/index.js';
-import { getProviderOrder } from './fallback.js';
+import { getProviderOrder, withFallback } from './fallback.js';
+import { createTranslator } from './translation.js';
 import { put } from './storage.js';
-import { getAppLanguage, getLanguage, t } from './i18n.js';
+import { getAppLanguage, getAppLanguageCode, getLanguage, t } from './i18n.js';
 
-/** @param {import('./provider.js').Provider[]} providers @param {() => void} refreshDescription */
-export function registerSettings(providers, refreshDescription) {
+/**
+ * @param {import('./provider.js').Provider[]} providers
+ * @param {ReturnType<typeof import('./provider-selection.js').createProviderSelection>} selection
+ * @param {() => void} refreshDescription
+ */
+export function registerSettings(providers, selection, refreshDescription) {
   let testing = false;
   /** @type {{ text: string, successful: boolean }[]} */
   let results = [];
@@ -35,7 +39,17 @@ export function registerSettings(providers, refreshDescription) {
   }
   const rainbowHeart = createRainbowHeart();
   const previews = createAdaptivePreviews(rainbowHeart.bind);
-  const updates = createUpdates(() => page.invalidate(), createGitHubSource(REPOSITORY));
+  const updates = createUpdates(() => page.invalidate(), createGitHubSource(REPOSITORY), {
+    // Notes follow the app's language, not Chatlate's interface choice.
+    language: getAppLanguageCode,
+    // Release notes use the selected service and its backups, like messages.
+    async translate(content, to, signal) {
+      const primary = providers[selection.read().index];
+      const translator = createTranslator(withFallback(primary, providers));
+      const [result] = await translator.translate({ texts: [content], from: ['en'], to, signal });
+      return /** @type {TextWithEntities} */ (result);
+    },
+  });
   const languageRow = createLanguageRow(() => page.invalidate());
   const donation = createDonation(rainbowHeart.icon());
   let linksExpanded = false;
@@ -55,7 +69,6 @@ export function registerSettings(providers, refreshDescription) {
   );
   const resultGroup = createStatusGroup(() => page.invalidate());
   const cooldownRow = createStatusRow(() => page.invalidate());
-  const selection = createProviderSelection(providers);
   const dragList = createDragList();
   let expanded = false;
   function clearResults() {

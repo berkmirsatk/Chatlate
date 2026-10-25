@@ -391,3 +391,45 @@ test('untrusted Retry-After and saved cooldowns cannot disable a provider indefi
   const reloaded = harness({ 'google.blockedUntil': 'Infinity' }, replyWith(['Merhaba']));
   assert.equal((await run(reloaded, [{ text: 'Hello' }]))[0].text, 'Merhaba');
 });
+
+test('Microsoft sends texts as a JSON array and keeps the characters each source used', async () => {
+  const requests = [];
+  const h = harness({}, async (url, options) => {
+    requests.push({ url, texts: JSON.parse(options.body), method: options.method });
+    return ok([
+      { translations: [{ text: 'a < b &amp;&amp; c' }] },
+      { translations: [{ text: 'Yaz &amp;amp;' }] },
+    ]);
+  });
+  const result = await runWith(
+    h,
+    'microsoft',
+    [{ text: 'a < b && c' }, { text: 'Write &amp;' }],
+    'zh-TW',
+  );
+  assert.equal(requests.length, 1);
+  assert.equal(requests[0].method, 'POST');
+  assert.match(
+    requests[0].url,
+    /^https:\/\/edge\.microsoft\.com\/translate\/translatetext\?.*&to=zh-Hant$/,
+  );
+  assert.deepEqual(requests[0].texts, ['a < b && c', 'Write &amp;']);
+  assert.equal(result[0].text, 'a < b && c');
+  // A source that spelled out an entity keeps it as written.
+  assert.equal(result[1].text, 'Yaz &amp;amp;');
+});
+
+test('Microsoft rejecting a target language hands the text to the next service', async () => {
+  const calls = [];
+  const h = harness(
+    { fallback: '["microsoft","google"]', provider: 'microsoft' },
+    async (url, options) => {
+      calls.push(url.includes('microsoft') ? 'Microsoft' : 'Google');
+      return url.includes('microsoft')
+        ? { ok: false, status: 400, headers: { get: () => '' } }
+        : googleReply(googleTexts(options).map(() => 'Merhaba'));
+    },
+  );
+  assert.equal((await runWith(h, 'microsoft', [{ text: 'Hello' }]))[0].text, 'Merhaba');
+  assert.deepEqual(calls, ['Microsoft', 'Google']);
+});

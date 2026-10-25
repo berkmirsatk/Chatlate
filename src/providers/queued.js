@@ -203,6 +203,7 @@ export function createQueuedProvider({
       );
     },
     clearCache: () => cache.clear(),
+    queueDelay: () => Math.max(0, nextStart - Date.now()),
     cooldownMessage: () => (blockedUntil > Date.now() ? cooldownError().message : ''),
   };
 }

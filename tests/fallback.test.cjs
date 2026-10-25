@@ -126,8 +126,9 @@ test('cancelled translation never starts a backup request', async () => {
   assert.equal(calls, 1);
 });
 
-test('primary attempt timeout leaves time for backup within the host budget', async () => {
-  const calls = [];
+test('an unresponsive primary hands over quickly, says so once and is skipped for a while', async () => {
+  const calls = [],
+    notices = [];
   const h = harness(
     { fallback: '["google","yandex"]' },
     async (url, options) => {
@@ -138,11 +139,18 @@ test('primary attempt timeout leaves time for backup within the host budget', as
       );
     },
     'en',
-    {},
-    { setTimeout: (fn, ms) => setTimeout(fn, ms === 5000 ? 100 : ms) },
+    {
+      ui: { bulletin: async (options) => notices.push(options.text) },
+      icons: { animation: (name) => name },
+    },
+    { setTimeout: (fn, ms) => setTimeout(fn, ms === 3500 ? 100 : ms) },
   );
   assert.equal((await run(h, [{ text: 'Hello' }]))[0].text, 'Merhaba');
   assert.deepEqual(calls, ['translate.googleapis.com', 'translate.yandex.net']);
+  assert.deepEqual(notices, ['Google is not responding. Translated with Yandex.']);
+  assert.equal((await run(h, [{ text: 'Another' }]))[0].text, 'Merhaba');
+  assert.deepEqual(calls.slice(2), ['translate.yandex.net']);
+  assert.equal(notices.length, 1);
 });
 
 test('connection test checks each enabled service directly after a failed primary', async () => {
@@ -207,7 +215,7 @@ test('one timed-out fallback subscriber does not abort another shared primary re
     },
     'en',
     {},
-    { setTimeout: (fn, ms) => setTimeout(fn, ms === 5000 && ++primaryTimerCount === 1 ? 100 : ms) },
+    { setTimeout: (fn, ms) => setTimeout(fn, ms === 3500 && ++primaryTimerCount === 1 ? 100 : ms) },
   );
   const first = run(h, [{ text: 'Hello' }]);
   const second = run(h, [{ text: 'Hello' }]);

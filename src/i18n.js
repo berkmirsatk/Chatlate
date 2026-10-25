@@ -17,7 +17,7 @@ const messages = {
     provider: 'Translation provider',
     testProvider: 'Test provider',
     chooseProvider: 'Select…',
-    selectInApp: 'Select Chatlate Google or Yandex in Inugram’s translation settings first.',
+    selectInApp: 'Select a Chatlate provider in Inugram’s translation settings first.',
     providerSyncFailed: 'Could not update Inugram’s provider. Select it in translation settings.',
     setup: 'Select a provider in the app’s translation settings.',
     test: 'Test connection',
@@ -41,6 +41,10 @@ const messages = {
     invalidResponse: 'Invalid translation response. Original text kept.',
     tooLarge: 'Too much text. Select fewer messages.',
     rateLimited: 'The translation service is limiting requests. Try again in {seconds} seconds.',
+    switchedSlow: '{from} is not responding. Translated with {to}.',
+    translationService: 'Translation service',
+    switchedLimited: '{from} is limiting requests. Translated with {to}.',
+    switchedFailed: '{from} could not translate. Translated with {to}.',
     invalidBatch: 'Invalid translation response.',
     fragmentTooLong: 'Text is too long for translation.',
     queueFull: 'Translation queue is full. Try again shortly.',
@@ -63,7 +67,7 @@ const messages = {
     provider: 'Çeviri sağlayıcısı',
     testProvider: 'Test sağlayıcısı',
     chooseProvider: 'Seçin…',
-    selectInApp: 'Önce Inugram’ın çeviri ayarlarından Chatlate Google veya Yandex’i seçin.',
+    selectInApp: 'Önce Inugram’ın çeviri ayarlarından bir Chatlate sağlayıcısı seçin.',
     providerSyncFailed: 'Inugram’ın sağlayıcısı değiştirilemedi. Çeviri ayarlarından seçin.',
     setup: 'Uygulamanın çeviri ayarlarından bir sağlayıcı seçin.',
     test: 'Bağlantıyı test et',
@@ -87,6 +91,10 @@ const messages = {
     invalidResponse: 'Geçersiz çeviri yanıtı. Orijinal metin korundu.',
     tooLarge: 'Metin fazla büyük. Daha az mesaj seçin.',
     rateLimited: 'Çeviri servisi istekleri sınırlıyor. {seconds} saniye sonra tekrar deneyin.',
+    switchedSlow: '{from} yanıt vermiyor. {to} ile çevrildi.',
+    translationService: 'Çeviri hizmeti',
+    switchedLimited: '{from} istekleri sınırlıyor. {to} ile çevrildi.',
+    switchedFailed: '{from} çeviremedi. {to} ile çevrildi.',
     invalidBatch: 'Geçersiz çeviri yanıtı.',
     fragmentTooLong: 'Metin çeviri için fazla uzun.',
     queueFull: 'Çeviri sırası dolu. Biraz sonra tekrar deneyin.',
@@ -108,6 +116,15 @@ export function getAppLanguage() {
   } catch {
     return 'en';
   }
+}
+
+/** The app's own language code, even one Chatlate has no strings for. */
+export function getAppLanguageCode() {
+  try {
+    const language = inu.info().language;
+    if (typeof language === 'string' && language) return language;
+  } catch {}
+  return 'en';
 }
 
 export function getLanguageOverride() {

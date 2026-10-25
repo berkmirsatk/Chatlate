@@ -19,11 +19,11 @@ const api = 'https://api.github.com/repos/' + repository;
 const source = Buffer.from('// ==InuPlugin==\n// reviewed package fixture\n');
 const hash = createHash('sha256').update(source).digest('hex');
 const release = () => ({
-  tag_name: 'v1.0.1',
-  html_url: 'https://github.com/' + repository + '/releases/tag/v1.0.1',
+  tag_name: 'v9.0.1',
+  html_url: 'https://github.com/' + repository + '/releases/tag/v9.0.1',
   body: '# Added\n- A feature\n```\n# literal code\n```',
   assets: [
-    { id: 42, name: 'Chatlate-1.0.1.inu.js', size: source.length, digest: 'sha256:' + hash },
+    { id: 42, name: 'Chatlate-9.0.1.inu.js', size: source.length, digest: 'sha256:' + hash },
   ],
 });
 
@@ -86,7 +86,7 @@ function harness(options = {}) {
                     call: (field) =>
                       field === 'getId'
                         ? options.id || 'io.inugram.community.chatlate'
-                        : options.version || '1.0.1',
+                        : options.version || '9.0.1',
                   };
                 },
               }),
@@ -115,7 +115,7 @@ test('release checks select the stable newer version without copying potentially
   const h = harness();
   assert.throws(() => h.create('../other/repo'), /Invalid repository/);
   const found = await h.create(repository).check(signal());
-  assert.equal(found.version, '1.0.1');
+  assert.equal(found.version, '9.0.1');
   assert.equal(found.url, release().html_url);
   assert.equal(found.notes.en, undefined);
   assert.equal(h.requests[0].url, api + '/releases/latest');
@@ -162,9 +162,9 @@ test('untrusted or incomplete release metadata cannot produce an update', async 
     { draft: true },
     { prerelease: true },
     { tag_name: 'v1.0.0' },
-    { tag_name: 'v1.0.1-beta' },
-    { tag_name: 'x1.0.1' },
-    { html_url: 'https://github.com/another/repo/releases/tag/v1.0.1' },
+    { tag_name: 'v9.0.1-beta' },
+    { tag_name: 'x9.0.1' },
+    { html_url: 'https://github.com/another/repo/releases/tag/v9.0.1' },
     { assets: [] },
     { assets: [...release().assets, ...release().assets] },
     ...[
@@ -186,15 +186,15 @@ test('untrusted or incomplete release metadata cannot produce an update', async 
 
 test('installation rechecks the selected tag and uses the native permission sheet only after verification', async () => {
   const h = harness();
-  await h.create(repository).install({ version: '1.0.1', url: 'https://untrusted.test' }, signal());
+  await h.create(repository).install({ version: '9.0.1', url: 'https://untrusted.test' }, signal());
   assert.deepEqual(
     h.requests.map(({ url }) => url),
-    [api + '/releases/tags/v1.0.1', api + '/releases/assets/42'],
+    [api + '/releases/tags/v9.0.1', api + '/releases/assets/42'],
   );
   assert.equal(h.requests[1].init.headers.Accept, 'application/octet-stream');
   assert.deepEqual(h.imports, [['startImport', 'fragment', source.toString(), null]]);
   const legacy = harness({ legacyImport: true });
-  await legacy.create(repository).install({ version: '1.0.1' }, signal());
+  await legacy.create(repository).install({ version: '9.0.1' }, signal());
   assert.deepEqual(legacy.imports, [['startImport', 'fragment', source.toString()]]);
 });
 
@@ -207,10 +207,10 @@ test('mismatched bytes, plugin identity, final host or missing page never reach 
     { invalidManifest: true },
     { noFragment: true },
     { finalUrl: 'https://release-assets.githubusercontent.com.evil.test/x' },
-    { release: { ...release(), tag_name: 'v1.0.2' } },
+    { release: { ...release(), tag_name: 'v9.0.2' } },
   ]) {
     const h = harness(options);
-    await assert.rejects(h.create(repository).install({ version: '1.0.1' }, signal()));
+    await assert.rejects(h.create(repository).install({ version: '9.0.1' }, signal()));
     assert.equal(h.imports.length, 0, JSON.stringify(options));
   }
 });
@@ -219,10 +219,10 @@ test('cancellation and invalid versions stop installation before download', asyn
   const h = harness(),
     controller = new AbortController();
   controller.abort();
-  await assert.rejects(h.create(repository).install({ version: '1.0.1' }, controller.signal));
+  await assert.rejects(h.create(repository).install({ version: '9.0.1' }, controller.signal));
   assert.equal(h.requests.length, 0);
   assert.equal(h.imports.length, 0);
-  for (const version of ['1.0.0', '0.9.9', '../latest', '1.0.2-beta']) {
+  for (const version of ['1.0.0', '0.9.9', '../latest', '9.0.2-beta']) {
     await assert.rejects(h.create(repository).install({ version }, signal()));
   }
   assert.equal(h.requests.length, 0);

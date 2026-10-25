@@ -275,7 +275,7 @@ test('custom icons stay centered and consistent while left handles drag and labe
   h.page.items();
   runtime.flush();
   const group = h.page.items().find((item) => item.native !== header && item.native)?.native;
-  for (const row of group.children) {
+  for (const [index, row] of group.children.entries()) {
     const [handle, label, toggle] = row.children,
       grip = handle.children[0];
     assert.deepEqual(grip.values.setLayoutParams.args, [20, 20, 17]);
@@ -289,7 +289,8 @@ test('custom icons stay centered and consistent while left handles drag and labe
     assert.ok(handle.values.setOnTouchListener);
     assert.equal(label.values.setOnTouchListener, undefined);
     assert.equal(label.values.setOnClickListener, undefined);
-    assert.equal(toggleSymbol(toggle), '⊖');
+    // Google and Yandex are enabled; Microsoft is available to add.
+    assert.equal(toggleSymbol(toggle), index < 2 ? '⊖' : '⊕');
   }
   runtime.drag(group, 1);
   runtime.event(3, 0);

@@ -23,6 +23,7 @@ export default defineConfig({
         grants: [
           'fetch(translate.googleapis.com)',
           'fetch(translate.yandex.net)',
+          'fetch(edge.microsoft.com)',
           'fetch(api.github.com)',
           'fetch(release-assets.githubusercontent.com)',
           'openUrl',

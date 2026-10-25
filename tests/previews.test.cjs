@@ -33,9 +33,12 @@ test('order summary delegates overflow scrolling to Android and expands the prov
   resize(100);
   assert.equal(summary.values.setSelected, true);
   assert.equal(summary.values.setHorizontalFadingEdgeEnabled, true);
+  // Scrolling text starts from its beginning instead of mid-way.
+  assert.equal(summary.values.setGravity, 19);
   resize(400);
   assert.equal(summary.values.setSelected, false);
   assert.equal(summary.values.setHorizontalFadingEdgeEnabled, false);
+  assert.equal(summary.values.setGravity, 21);
   resize(100);
   assert.equal(summary.values.setSelected, true);
   assert.equal(summary.values.setContentDescription, '1. Google → 2. Yandex');

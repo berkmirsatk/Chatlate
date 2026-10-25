@@ -98,7 +98,8 @@ const orderAction = (h, label) => {
     (row) => row.id?.startsWith('order.') || row.id?.startsWith('add.'),
   )) {
     if (row.text === label) selected ||= row;
-    else
+    // Add rows act directly; only order rows open a menu of actions.
+    else if (row.id.startsWith('order.'))
       row.onClick({
         openMenu: (items) => {
           selected ||= items.find((item) => item.text === label);
@@ -109,7 +110,7 @@ const orderAction = (h, label) => {
   selected.onClick();
 };
 const chooseProvider = (h, index) => {
-  const name = ['Google', 'Yandex'][index];
+  const name = ['Google', 'Yandex', 'Microsoft'][index];
   const rows = openOrder(h)
     .items()
     .filter((row) => row.id?.startsWith('order.'));

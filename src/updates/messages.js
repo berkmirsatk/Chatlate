@@ -18,6 +18,8 @@ const messages = {
     loadingNotes: 'Loading release notes…',
     notesFailed: 'Could not load release notes. Check your connection.',
     retry: 'Try again',
+    translate: 'Translate',
+    showOriginal: 'Show original',
   },
   tr: {
     title: 'Güncellemeler',
@@ -36,6 +38,8 @@ const messages = {
     loadingNotes: 'Sürüm notları yükleniyor…',
     notesFailed: 'Sürüm notları yüklenemedi. İnternet bağlantınızı kontrol edin.',
     retry: 'Yeniden dene',
+    translate: 'Çevir',
+    showOriginal: 'Orijinalini göster',
   },
 };
 
