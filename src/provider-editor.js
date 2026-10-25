@@ -135,6 +135,7 @@ export function createProviderEditor({
             inu.ui.button({
               id: 'add.' + item.id,
               text: t('addProvider', { name: item.name }),
+              subtitle: item.id === 'deepl' ? t('deeplLimits') : undefined,
               onClick: () => save([...order, item]),
             }),
           );

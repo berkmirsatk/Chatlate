@@ -197,6 +197,10 @@ export function createDragList() {
             const current = state;
             if (!current || current.dragging || current.finishing) return;
             const id = String(view.call('getTag'));
+            if (id === 'deepl.warning') {
+              setTimeout(() => inu.ui.toast(t('deeplLimits')), 0);
+              return;
+            }
             if (current.ids.includes(id) && current.ids.length === 1) return;
             current.finishing = true;
             setTimeout(() => {
@@ -246,6 +250,7 @@ export function createDragList() {
         try {
           initialize();
           // Localization/storage APIs run here, outside the UI callback.
+          const warningText = t('deeplLimits');
           const actions = new Map(
             providers.map((item) => [
               item.id,
@@ -351,6 +356,31 @@ export function createDragList() {
                   icon.call('setOnClickListener', new classes.click());
                   icon.call('setClickable', true);
                   row.call('addView', icon);
+                  if (item.id === 'deepl') {
+                    const warning = new (inu.jvm.cls('android.widget.FrameLayout'))(context);
+                    warning.call(
+                      'setLayoutParams',
+                      new (inu.jvm.cls('android.widget.LinearLayout$LayoutParams'))(
+                        classes.utilities.callStatic('dp', 40),
+                        step,
+                      ),
+                    );
+                    warning.call('setTag', 'deepl.warning');
+                    warning.call('setContentDescription', warningText);
+                    const mark = new (inu.jvm.cls('android.widget.ImageView'))(context);
+                    mark.call(
+                      'setLayoutParams',
+                      new (inu.jvm.cls('android.widget.FrameLayout$LayoutParams'))(
+                        classes.utilities.callStatic('dp', 20),
+                        classes.utilities.callStatic('dp', 20),
+                        17,
+                      ),
+                    );
+                    setCustomIcon(mark, 'warning', disabledColor, classes.utilities);
+                    warning.call('addView', mark);
+                    warning.call('setOnClickListener', new classes.click());
+                    row.call('addView', warning);
+                  }
                   rows.set(item.id, row);
                   labels.set(item.id, label);
                   icons.set(item.id, icon);

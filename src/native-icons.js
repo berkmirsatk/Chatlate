@@ -2,7 +2,7 @@
 const bitmaps = new Map();
 
 /** Shared circle and stroke for all controls. Runs on the UI thread.
- * @param {'chevron' | 'plus' | 'minus' | 'reorder'} kind
+ * @param {'chevron' | 'plus' | 'minus' | 'reorder' | 'warning'} kind
  */
 function drawIcon(kind, color, utilities) {
   const size = Number(utilities.callStatic('dp', 20));
@@ -33,6 +33,9 @@ function drawIcon(kind, color, utilities) {
       path.call('lineTo', 10 * unit, 12 * unit);
       path.call('lineTo', 14 * unit, 8 * unit);
       canvas.call('drawPath', path, paint);
+    } else if (kind === 'warning') {
+      canvas.call('drawLine', 10 * unit, 5 * unit, 10 * unit, 11 * unit, paint);
+      canvas.call('drawCircle', 10 * unit, 14 * unit, 0.7 * unit, paint);
     } else {
       canvas.call('drawLine', 6 * unit, 10 * unit, 14 * unit, 10 * unit, paint);
       if (kind === 'plus')
@@ -53,7 +56,7 @@ export function createExpansionIcon(context, color, utilities, expanded) {
 }
 
 /** Apply Chatlate’s shared custom style, independent of the app icon pack.
- * @param {'chevron' | 'plus' | 'minus' | 'reorder'} kind
+ * @param {'chevron' | 'plus' | 'minus' | 'reorder' | 'warning'} kind
  */
 export function setCustomIcon(view, kind, color, utilities) {
   view.call('setImageBitmap', drawIcon(kind, color, utilities));

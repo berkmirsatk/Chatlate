@@ -30,6 +30,8 @@ const messages = {
     moveUp: 'Move up: {name}',
     moveDown: 'Move down: {name}',
     addProvider: 'Add: {name}',
+    deeplLimits:
+      'DeepL has stricter limits: up to 1,500 characters per request. An enabled backup handles oversized text or temporary limits.',
     removeProvider: 'Remove: {name}',
     fallbackPrivacy: 'On failure, text may be sent to the next service in the selected order.',
     connectionFailed: 'Could not connect to the translation service.',
@@ -80,6 +82,8 @@ const messages = {
     moveUp: 'Yukarı taşı: {name}',
     moveDown: 'Aşağı taşı: {name}',
     addProvider: 'Ekle: {name}',
+    deeplLimits:
+      'DeepL daha sınırlıdır: istek başına en fazla 1.500 karakter. Uzun metinlerde veya geçici sınırlarda etkin yedek sağlayıcı kullanılır.',
     removeProvider: 'Kaldır: {name}',
     fallbackPrivacy: 'Hata durumunda metin sıralamadaki sonraki servise gönderilebilir.',
     connectionFailed: 'Çeviri servisine bağlanılamadı.',
