@@ -4,7 +4,7 @@
 
 ### Providers
 
-- Microsoft Translator joins Google and Yandex, with no key needed.
+- Microsoft Translator joins Google and Yandex.
 - Switch services from the translate bar's menu in any chat.
 
 ### Translation
