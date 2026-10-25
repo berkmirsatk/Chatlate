@@ -8,7 +8,8 @@ function chatRuntime(selected = 'installation:chatlate.google') {
   let hidden = false,
     detected = false,
     translating = false,
-    visibility = 8;
+    visibility = 8,
+    panelVisible;
   const config = {
     getValue: () => ({ contains: (part) => selected.includes(part) }),
     call: () => selected,
@@ -34,6 +35,10 @@ function chatRuntime(selected = 'installation:chatlate.google') {
     },
   };
   const chat = {
+    translateButton: {},
+    topPanelLayout: {
+      isViewVisible: () => panelVisible ?? (!hidden && controller.isDialogTranslatable()),
+    },
     translateItem: { setVisibility: (value) => (visibility = value) },
     getMessagesController: () => ({ getTranslateController: () => controller }),
     getDialogId: () => -1001,
@@ -77,6 +82,11 @@ function chatRuntime(selected = 'installation:chatlate.google') {
   harness({}, undefined, 'en', native);
   assert.ok(hooks.has('updateTranslateItemVisibility'));
   return {
+    panel(value) {
+      panelVisible = value;
+      hooks.get('updateTopPanel(Z)V').after({ thisObject: chat });
+      return visibility;
+    },
     detect: () => (detected = true),
     translate: () => (translating = true),
     hide(value) {
@@ -126,4 +136,13 @@ test("another translation service keeps Telegram's menu visibility rules", () =>
   assert.equal(chat.menu(), 0);
   chat.hide(false);
   assert.equal(chat.menu(), 8);
+});
+
+test('a manually visible bar hides Translate even when the chat is not detected as translatable', () => {
+  const chat = chatRuntime();
+  assert.equal(chat.menu(), 0);
+  assert.equal(chat.panel(true), 8);
+  assert.equal(chat.menu(), 8);
+  assert.equal(chat.panel(false), 0);
+  assert.equal(chat.panel(true), 8);
 });

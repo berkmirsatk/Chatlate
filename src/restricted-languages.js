@@ -94,31 +94,31 @@ export function registerRestrictedLanguages() {
         },
       },
     );
-    // A chat that is not detected as translatable, such as a Turkish group with a few English
-    // messages, can still be translated from the chat menu when its bar is unavailable.
+    // Follow the panel's visibility, including manually opened bars in same-language chats.
+    const updateItem = inu.xposed.routine((ctx) => {
+      const chat = ctx.thisObject;
+      const item = chat.translateItem;
+      if (item === null || !selected.getValue().contains(':chatlate.')) return;
+      const panel = chat.topPanelLayout;
+      const button = chat.translateButton;
+      const visible = panel !== null && button !== null && panel.isViewVisible(button);
+      item.setVisibility(visible ? 8 : 0);
+    });
+    const Chat = inu.jvm.cls('org.telegram.ui.ChatActivity');
     const disposeItem = inu.xposed.hookMethod(
-      inu.jvm
-        .cls('org.telegram.ui.ChatActivity')
-        .getDeclaredMethod('updateTranslateItemVisibility'),
-      {
-        after: inu.xposed.routine((ctx) => {
-          const chat = ctx.thisObject;
-          const item = chat.translateItem;
-          if (item === null || !selected.getValue().contains(':chatlate.')) return;
-          const controller = chat.getMessagesController().getTranslateController();
-          const dialog = chat.getDialogId();
-          const show =
-            controller.isTranslateDialogHidden(dialog) || !controller.isDialogTranslatable(dialog);
-          item.setVisibility(show ? 0 : 8);
-        }),
-      },
+      Chat.getDeclaredMethod('updateTranslateItemVisibility'),
+      { after: updateItem },
     );
+    const disposePanel = inu.xposed.hookMethod(Chat.getDeclaredMethod('updateTopPanel(Z)V'), {
+      after: updateItem,
+    });
     inu.onUnload(() => {
       dispose();
       disposeBar();
       disposeOpen();
       disposeHide();
       disposeItem();
+      disposePanel();
     });
     // Chats marked translatable before are checked again with these rules.
     const accounts = Number(
