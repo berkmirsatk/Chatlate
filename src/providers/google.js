@@ -22,6 +22,9 @@ export function createGoogleProvider() {
     // Each text is detected separately, so one request may mix languages.
     detectsEachText: true,
     async fetchParts(texts, to, signal) {
+      const body = texts.map((text) => 'q=' + encodeURIComponent(escape(text))).join('&');
+      // The queue may contain one fragment that exceeds the entire batch budget.
+      if (body.length > MAX_ENCODED_BATCH) throw new InvalidResponseError('fragmentTooLong');
       const headers = {
         'User-Agent': USER_AGENT,
         'Accept-Language': 'en-US,en;q=0.9',
@@ -35,7 +38,7 @@ export function createGoogleProvider() {
             encodeURIComponent(to),
           headers,
           signal,
-          texts.map((text) => 'q=' + encodeURIComponent(escape(text))).join('&'),
+          body,
         );
       } catch (error) {
         if (error instanceof HttpError) {

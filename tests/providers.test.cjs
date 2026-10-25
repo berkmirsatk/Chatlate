@@ -165,7 +165,40 @@ test('Google batches stay within an encoded size limit for non-Latin text', asyn
   const results = await Promise.all([1, 2, 3].map((n) => run(h, [{ text: message + ' ' + n }])));
   assert.equal(results.length, 3);
   assert.ok(bodies.length >= 2);
-  assert.ok(bodies.every((size) => size <= 10500));
+  assert.ok(bodies.every((size) => size <= 10000));
+});
+
+test('Google accepts a single fragment exactly at the encoded body limit', async () => {
+  let size;
+  const h = harness({}, async (_url, options) => {
+    size = Buffer.byteLength(options.body, 'utf8');
+    return googleReply(['Merhaba']);
+  });
+  const text = '界'.repeat(1000) + 'a'.repeat(998);
+  assert.equal((await run(h, [{ text }]))[0].text, 'Merhaba');
+  assert.equal(size, 10000);
+});
+
+test('Google rejects a single oversized encoded fragment before sending it', async () => {
+  let calls = 0;
+  const h = harness({}, async () => {
+    calls++;
+    return googleReply(['Merhaba']);
+  });
+  await assert.rejects(run(h, [{ text: '界'.repeat(1000) + 'a'.repeat(999) }]), /too long/);
+  assert.equal(calls, 0);
+});
+
+test('an oversized Google fragment falls back without truncating the source', async () => {
+  const text = '界'.repeat(1500),
+    hosts = [];
+  const h = harness({ fallback: '["google","yandex"]' }, async (url, options) => {
+    hosts.push(new URL(url).hostname);
+    assert.deepEqual(new URLSearchParams(options.body).getAll('text'), [text]);
+    return ok({ code: 200, text: ['Uzun metin'] });
+  });
+  assert.equal((await run(h, [{ text }]))[0].text, 'Uzun metin');
+  assert.deepEqual(hosts, ['translate.yandex.net']);
 });
 
 test('Google CAPTCHA redirects start a cooldown and use the backup service', async () => {
