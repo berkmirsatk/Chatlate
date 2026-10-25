@@ -2,7 +2,7 @@ import { registeredProviderId } from './identity.js';
 import { withFallback } from './fallback.js';
 import { createTranslator } from './translation.js';
 
-const MAX_TRANSLATIONS = 20;
+const MAX_PROFILES = 20;
 
 /** Telegram collapses runs of blank lines before showing a description. @param {string} text */
 const shown = (text) => text.replace(/\n{3,}/g, '\n\n');
@@ -27,6 +27,8 @@ export function descriptionEntities(text) {
   });
 }
 
+/** @typedef {{id: number, fragment: any, original: string, to: string, text: string | undefined, controller: AbortController | undefined}} ProfileTranslation */
+
 /**
  * Translates group, channel and user descriptions in place instead of in Telegram's popup.
  * Tapping Translate again shows the original. Only applies while a Chatlate service is selected.
@@ -34,27 +36,51 @@ export function descriptionEntities(text) {
  * @param {ReturnType<typeof import('./provider-selection.js').createProviderSelection>} selection
  */
 export function registerProfileTranslation(providers, selection) {
-  /** Original description → its translation and the profile showing it.
-   * @type {Map<string, {text: string, owner: number}>} */
-  const translations = new Map();
-  const pending = new Set();
+  /** @type {Map<number, ProfileTranslation>} */
+  const profiles = new Map();
+  let disposed = false;
   /** @type {(() => void)[]} */
   const disposers = [];
   try {
     const ProfileActivity = inu.jvm.cls('org.telegram.ui.ProfileActivity');
     const alert = inu.jvm.cls('org.telegram.ui.Components.TranslateAlert2');
     const cell = inu.jvm.cls('org.telegram.ui.Cells.AboutLinkCell');
-    const system = inu.jvm.cls('java.lang.System');
     const config = inu.jvm.cls('desu.inugram.InuConfig');
     const utilities = inu.jvm.cls('org.telegram.messenger.AndroidUtilities');
-    const ownerOf = (fragment) => Number(system.callStatic('identityHashCode', fragment));
+    // BaseFragment assigns a unique request guid to each profile instance.
+    const ownerOf = (fragment) => Number(fragment.call('getClassGuid'));
+    const current = (state) => !disposed && profiles.get(state.id) === state;
     const chatlateSelected = () => {
       const key = String(config.getStaticField('TRANSLATION_PROVIDER').call('getValue'));
       return providers.some((provider) => key.endsWith(':' + registeredProviderId(provider.id)));
     };
 
-    /** @param {any} fragment */
-    function refresh(fragment) {
+    /** Called by UI-thread hooks; abort listeners must run on the plugin thread.
+     * @param {ProfileTranslation} state */
+    function forget(state) {
+      profiles.delete(state.id);
+      const controller = state.controller;
+      state.controller = undefined;
+      if (controller) setTimeout(() => controller.abort(), 0);
+    }
+
+    /** @param {any} fragment @returns {ProfileTranslation} */
+    function stateFor(fragment) {
+      const id = ownerOf(fragment);
+      let state = profiles.get(id);
+      if (!state) {
+        const oldest = profiles.values().next().value;
+        if (profiles.size >= MAX_PROFILES && oldest) forget(oldest);
+        state = { id, fragment, original: '', to: '', text: undefined, controller: undefined };
+        profiles.set(id, state);
+      }
+      return state;
+    }
+
+    /** @param {ProfileTranslation} state */
+    function refresh(state) {
+      if (!current(state)) return;
+      const fragment = state.fragment;
       const rows = ['channelInfoRow', 'userInfoRow', 'bioRow'].map((name) => {
         try {
           return Number(fragment.getField(name));
@@ -65,6 +91,7 @@ export function registerProfileTranslation(providers, selection) {
       utilities.callStatic(
         'runOnUIThread',
         inu.jvm.runnable(() => {
+          if (!current(state)) return;
           try {
             const adapter = fragment.getField('listAdapter');
             for (const row of rows) if (row >= 0) adapter.call('notifyItemChanged', row);
@@ -75,32 +102,52 @@ export function registerProfileTranslation(providers, selection) {
       );
     }
 
-    /** @param {any} fragment @param {string} original @param {string} to @param {string | null} from */
-    async function toggle(fragment, original, to, from) {
+    /** @param {ProfileTranslation} state @param {string} original @param {string} to @param {string | null} from */
+    async function toggle(state, original, to, from) {
+      if (!current(state) || !chatlateSelected()) return;
       const key = shown(original);
-      if (translations.delete(key)) {
-        refresh(fragment);
-        return;
+      if (state.original === key && state.to === to) {
+        if (state.controller) return;
+        if (state.text !== undefined) {
+          state.text = undefined;
+          refresh(state);
+          return;
+        }
       }
-      if (pending.has(key)) return;
-      pending.add(key);
+      state.controller?.abort();
+      const controller = new AbortController();
+      state.original = key;
+      state.to = to;
+      state.text = undefined;
+      state.controller = controller;
       try {
         const primary = providers[selection.read().index];
         const [result] = await createTranslator(withFallback(primary, providers)).translate({
           texts: [{ text: original, entities: descriptionEntities(original) }],
           from: [from],
           to,
-          signal: new AbortController().signal,
+          signal: controller.signal,
         });
-        const oldest = translations.keys().next().value;
-        if (translations.size >= MAX_TRANSLATIONS && oldest !== undefined)
-          translations.delete(oldest);
-        translations.set(key, { text: shown(result.text), owner: ownerOf(fragment) });
-        refresh(fragment);
+        if (
+          !current(state) ||
+          state.controller !== controller ||
+          controller.signal.aborted ||
+          !chatlateSelected()
+        )
+          return;
+        state.text = shown(result.text);
+        refresh(state);
       } catch (error) {
-        if (typeof error?.message === 'string' && error.message) inu.ui.toast(error.message);
+        if (
+          current(state) &&
+          state.controller === controller &&
+          !controller.signal.aborted &&
+          typeof error?.message === 'string' &&
+          error.message
+        )
+          inu.ui.toast(error.message);
       } finally {
-        pending.delete(key);
+        if (state.controller === controller) state.controller = undefined;
       }
     }
 
@@ -114,14 +161,16 @@ export function registerProfileTranslation(providers, selection) {
           filter: inu.jvm.routine((_context, fragment) => fragment instanceof ProfileActivity),
           before(ctx) {
             try {
-              if (!chatlateSelected()) return;
+              if (disposed || !chatlateSelected()) return;
               const fragment = ctx.args[1];
+              // Register before scheduling: the profile may close before toggle runs.
+              const state = stateFor(fragment);
               const text = String(ctx.args[5]);
               const to = String(ctx.args[4]);
               const from = ctx.args[3] && ctx.args[3] !== 'und' ? String(ctx.args[3]) : null;
               ctx.setReturnValue(null);
               // Translating needs the plugin thread.
-              setTimeout(() => void toggle(fragment, text, to, from), 0);
+              setTimeout(() => void toggle(state, text, to, from), 0);
             } catch {
               /* Telegram's popup still opens */
             }
@@ -134,21 +183,27 @@ export function registerProfileTranslation(providers, selection) {
         cell.getDeclaredMethod('setTextAndValue(Ljava/lang/String;Ljava/lang/String;Z)V'),
         {
           before(ctx) {
-            if (!translations.size || typeof ctx.args[0] !== 'string') return;
-            const translation = translations.get(shown(ctx.args[0]));
-            if (translation) ctx.args[0] = translation.text;
+            if (!profiles.size || typeof ctx.args[0] !== 'string' || !chatlateSelected()) return;
+            try {
+              // AboutLinkCell retains its owning fragment even before it is attached.
+              const fragment = ctx.thisObject?.getField('parentFragment');
+              if (!fragment) return;
+              const state = profiles.get(ownerOf(fragment));
+              if (state?.text !== undefined && state.original === shown(ctx.args[0]))
+                ctx.args[0] = state.text;
+            } catch {
+              /* unrelated cells keep their original text */
+            }
           },
         },
       ),
     );
-    // A closed profile forgets its translations.
+    // Invalidate synchronously; a response racing the deferred abort is discarded.
     disposers.push(
       inu.xposed.hookMethod(ProfileActivity.getDeclaredMethod('onFragmentDestroy'), {
         before(ctx) {
-          if (!translations.size) return;
-          const owner = ownerOf(ctx.thisObject);
-          for (const [key, translation] of translations)
-            if (translation.owner === owner) translations.delete(key);
+          const state = profiles.get(ownerOf(ctx.thisObject));
+          if (state) forget(state);
         },
       }),
     );
@@ -156,6 +211,9 @@ export function registerProfileTranslation(providers, selection) {
     /* hosts without hooking keep Telegram's popup */
   }
   inu.onUnload?.(() => {
+    disposed = true;
+    for (const state of profiles.values()) state.controller?.abort();
+    profiles.clear();
     for (const dispose of disposers) dispose();
   });
 }
