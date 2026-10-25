@@ -329,7 +329,11 @@ export function createDragList() {
                   label.call('setPadding', classes.utilities.callStatic('dp', 7), 0, 0, 0);
                   label.call(
                     'setLayoutParams',
-                    new (inu.jvm.cls('android.widget.LinearLayout$LayoutParams'))(0, step, 1),
+                    new (inu.jvm.cls('android.widget.LinearLayout$LayoutParams'))(
+                      item.id === 'deepl' ? -2 : 0,
+                      step,
+                      item.id === 'deepl' ? 0 : 1,
+                    ),
                   );
                   label.call('setClickable', false);
                   row.call('addView', label);
@@ -375,10 +379,24 @@ export function createDragList() {
                         17,
                       ),
                     );
-                    setCustomIcon(mark, 'warning', disabledColor, classes.utilities);
+                    setCustomIcon(
+                      mark,
+                      'warning',
+                      theme.callStatic(
+                        'getColor',
+                        theme.getStaticField('key_avatar_nameInMessageOrange'),
+                      ),
+                      classes.utilities,
+                    );
                     warning.call('addView', mark);
                     warning.call('setOnClickListener', new classes.click());
                     row.call('addView', warning);
+                    const space = new (inu.jvm.cls('android.view.View'))(context);
+                    space.call(
+                      'setLayoutParams',
+                      new (inu.jvm.cls('android.widget.LinearLayout$LayoutParams'))(0, step, 1),
+                    );
+                    row.call('addView', space);
                   }
                   row.call('addView', icon);
                   rows.set(item.id, row);
