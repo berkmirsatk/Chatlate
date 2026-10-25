@@ -95,7 +95,7 @@ export function registerRestrictedLanguages() {
       },
     );
     // A chat that is not detected as translatable, such as a Turkish group with a few English
-    // messages, can still be translated from the chat menu whenever it is not already.
+    // messages, can still be translated from the chat menu when its bar is unavailable.
     const disposeItem = inu.xposed.hookMethod(
       inu.jvm
         .cls('org.telegram.ui.ChatActivity')
@@ -107,8 +107,9 @@ export function registerRestrictedLanguages() {
           if (item === null || !selected.getValue().contains(':chatlate.')) return;
           const controller = chat.getMessagesController().getTranslateController();
           const dialog = chat.getDialogId();
-          if (controller.isTranslateDialogHidden(dialog) || !controller.isTranslatingDialog(dialog))
-            item.setVisibility(0);
+          const show =
+            controller.isTranslateDialogHidden(dialog) || !controller.isDialogTranslatable(dialog);
+          item.setVisibility(show ? 0 : 8);
         }),
       },
     );
