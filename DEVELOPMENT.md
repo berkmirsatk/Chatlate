@@ -1,19 +1,8 @@
-# Development previews
+## Providers
 
-## Preview 5
-- Add a circular warning beside DeepL's enable/disable control. Tap it to read its limits.
-- Include cumulative development notes in private bot previews.
+- Keep DeepL's enable/disable button aligned with the other providers; place its warning on the left.
+- Keep the DeepL warning short and easy to read.
 
-## Preview 4
-- Add optional keyless DeepL translation, with bounded requests, cooldown and backup support.
+## Previews
 
-## Preview 3
-- Fix update package decoding and separate the release heading from version details.
-
-## Preview 2
-- Restore manually translated messages when showing originals for the whole chat.
-
-## Preview 1
-- Keep the chat's Translate menu entry in sync with the translation bar, including same-language chats and Hide/Undo.
-- Scope profile translations to their screen and cancel work when it closes.
-- Enforce Google's encoded request size limit without truncating text.
+- Show only this preview's changes, grouped by topic with individual bullet points.

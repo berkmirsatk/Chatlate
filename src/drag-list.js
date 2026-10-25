@@ -355,7 +355,6 @@ export function createDragList() {
                   symbols.set(item.id, symbol);
                   icon.call('setOnClickListener', new classes.click());
                   icon.call('setClickable', true);
-                  row.call('addView', icon);
                   if (item.id === 'deepl') {
                     const warning = new (inu.jvm.cls('android.widget.FrameLayout'))(context);
                     warning.call(
@@ -381,6 +380,7 @@ export function createDragList() {
                     warning.call('setOnClickListener', new classes.click());
                     row.call('addView', warning);
                   }
+                  row.call('addView', icon);
                   rows.set(item.id, row);
                   labels.set(item.id, label);
                   icons.set(item.id, icon);

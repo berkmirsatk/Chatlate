@@ -79,7 +79,7 @@ test('order summary delegates overflow scrolling to Android and expands the prov
   assert.equal(circle[4].values.setStrokeWidth, 1.5);
   const providerGroup = h.page.items().find((item) => item.native && item.native !== row).native;
   for (const providerRow of providerGroup.children) {
-    const slot = providerRow.children[2],
+    const slot = providerRow.children.at(-1),
       symbol = slot.children[0],
       providerBitmap = symbol.values.setImageBitmap;
     const providerCircle = providerBitmap.canvas.calls.find((call) => call[0] === 'drawCircle');

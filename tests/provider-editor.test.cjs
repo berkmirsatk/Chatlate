@@ -50,7 +50,7 @@ test('inline provider editor uses native dragging and persists only a completed 
   assert.equal(root.values.setOnDragListener, undefined);
   for (const row of root.children) {
     assert.equal(row.children[0].values.setOnTouchListener, null);
-    assert.equal(row.children[2].values.setOnClickListener, null);
+    assert.equal(row.children.at(-1).values.setOnClickListener, null);
   }
 });
 
@@ -276,7 +276,8 @@ test('custom icons stay centered and consistent while left handles drag and labe
   runtime.flush();
   const group = h.page.items().find((item) => item.native !== header && item.native)?.native;
   for (const [index, row] of group.children.entries()) {
-    const [handle, label, toggle] = row.children,
+    const [handle, label] = row.children,
+      toggle = row.children.at(-1),
       grip = handle.children[0];
     assert.deepEqual(grip.values.setLayoutParams.args, [20, 20, 17]);
     assert.equal(grip.values.setImageBitmap.width, 20);
@@ -291,6 +292,10 @@ test('custom icons stay centered and consistent while left handles drag and labe
     assert.equal(label.values.setOnClickListener, undefined);
     // Google and Yandex are enabled; Microsoft is available to add.
     assert.equal(toggleSymbol(toggle), index < 2 ? '⊖' : '⊕');
+    if (row.values.setTag === 'deepl') {
+      assert.equal(row.children[2].values.setTag, 'deepl.warning');
+      assert.equal(row.children.length, 4);
+    }
   }
   runtime.drag(group, 1);
   runtime.event(3, 0);
