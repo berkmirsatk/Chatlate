@@ -2,7 +2,7 @@ const assert = require('node:assert/strict');
 const { test } = require('node:test');
 const vm = require('node:vm');
 const { buildSync } = require('esbuild');
-// Exercise three simulated providers without shipping an unverified third service.
+// Exercise provider ordering independently of live translation services.
 const fixture = buildSync({
   stdin: {
     contents:

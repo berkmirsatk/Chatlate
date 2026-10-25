@@ -31,7 +31,7 @@ Translation text is user data: never log it or send it to the distribution servi
 
 ## Add a provider
 
-Implement `Provider` from `src/provider.js`, register it in `src/index.js`, add its stable ID to `identity.js` and declare only its required fetch host. Reuse `createQueuedProvider` for caching, spacing, cancellation and cooldowns. Preserve the complete fragment contract: reject missing or changed separators with `InvalidResponseError` instead of applying partial translations, so the next enabled service can retry. Use `batchSize`/`batchLimit` when the service bounds request size by encoded bytes. Set `detectsEachText` only when the service detects every text's language separately; otherwise batches keep to one detected language or writing system. Add request, cancellation, quota and formatting regression coverage.
+Implement `Provider` from `src/provider.js`, register it in `src/index.js`, choose a stable provider ID and declare only its required fetch host. Reuse `createQueuedProvider` for caching, spacing, cancellation and cooldowns. Preserve the complete fragment contract: reject missing or malformed results with `InvalidResponseError` instead of applying partial translations, so the next enabled service can retry. Use `batchSize`/`batchLimit` when the service bounds request size by encoded bytes. Enforce hard limits on individual fragments in the adapter too: the queue may dispatch a single fragment above its batch target. Never truncate text to meet a service limit; reject it recoverably so an enabled backup receives the complete source. Set `detectsEachText` only when the service detects every text's language separately; otherwise batches keep to one detected language or writing system. Add request, cancellation, quota and formatting regression coverage.
 
 ## Add a language
 
@@ -69,7 +69,7 @@ The bot announces the newest published Release in `@Plumgins` once, records the 
 
 ## Version and publish
 
-Update `package.json`, `package-lock.json` and `PLUGIN_VERSION` in `identity.js` together. Use 1.0.1 for fixes, 1.1.0 for compatible features and 2.0.0 for breaking changes.
+Update `package.json`, `package-lock.json` and `PLUGIN_VERSION` in `identity.js` together. Increment the patch version for fixes, the minor version for compatible features and the major version for breaking changes.
 
 Complete [the release checklist](docs/RELEASE_CHECKLIST.md), merge the finished source into `main` and run **Actions → Prepare release** on it. It installs dependencies, runs all package checks and uploads the installer/checksum to a draft Release using GitHub's own token. It refuses to overwrite a published Release and leaves publication to a separate explicit action. No personal access token is needed. Do not publish demo scenarios or fake versions; the installer belongs in Release assets rather than the source tree.
 

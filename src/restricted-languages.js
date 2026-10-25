@@ -9,6 +9,22 @@ const MAX_OPENED = 200;
  * Runs as routines: Telegram asks for every message it checks.
  */
 export function registerRestrictedLanguages() {
+  /** @type {(() => void)[]} */
+  const disposers = [];
+  function cleanup() {
+    for (const dispose of disposers.splice(0).reverse()) {
+      try {
+        dispose();
+      } catch {
+        /* Continue detaching other hooks if a host method has disappeared. */
+      }
+    }
+  }
+  /** @param {any} method @param {any} callbacks */
+  function hook(method, callbacks) {
+    disposers.push(inu.xposed.hookMethod(method, callbacks));
+  }
+  inu.onUnload?.(cleanup);
   try {
     const config = inu.jvm.cls('desu.inugram.InuConfig');
     const selected = config.getStaticField('TRANSLATION_PROVIDER');
@@ -17,30 +33,28 @@ export function registerRestrictedLanguages() {
     /** @type {any} */
     const Alert = inu.jvm.cls('org.telegram.ui.Components.TranslateAlert2');
     const Controller = inu.jvm.cls('org.telegram.messenger.TranslateController');
-    const dispose = inu.xposed.hookMethod(
-      Controller.getDeclaredMethod('isLanguageRestricted(Ljava/lang/String;)Z'),
-      {
-        after: inu.xposed.routine((ctx) => {
-          const language = ctx.args[0];
-          if (language === null || !selected.getValue().contains(':chatlate.')) return;
-          const to = Alert.getToLanguage();
-          ctx.setReturnValue(
-            Restricted.getRestrictedLanguages().contains(language) ||
-              (to !== null &&
-                (to.equals(language) ||
-                  to.startsWith(language + '-') ||
-                  to.startsWith(language + '_'))),
-          );
-        }),
-      },
-    );
+    hook(Controller.getDeclaredMethod('isLanguageRestricted(Ljava/lang/String;)Z'), {
+      after: inu.xposed.routine((ctx) => {
+        const language = ctx.args[0];
+        if (language === null || !selected.getValue().contains(':chatlate.')) return;
+        const to = Alert.getToLanguage();
+        ctx.setReturnValue(
+          Restricted.getRestrictedLanguages().contains(language) ||
+            (to !== null &&
+              (to.equals(language) ||
+                to.startsWith(language + '-') ||
+                to.startsWith(language + '_'))),
+        );
+      }),
+    });
     // Chats whose translation the user turned on keep their bar until Hide, even when their
     // messages do not count as translatable, so Show original does not take the bar away.
     /** @type {string[]} */
     let saved = [];
     try {
       const stored = JSON.parse(get('openedChats', '[]'));
-      if (Array.isArray(stored)) saved = stored.filter((key) => typeof key === 'string');
+      if (Array.isArray(stored))
+        saved = [...new Set(stored.filter((key) => typeof key === 'string'))].slice(-MAX_OPENED);
     } catch {}
     /** @type {any} */
     const opened = inu.jvm
@@ -49,69 +63,58 @@ export function registerRestrictedLanguages() {
     for (const key of saved) opened.call('add', key);
     const remember = (key, keep) => {
       saved = saved.filter((item) => item !== key);
-      if (keep) saved = [...saved, key].slice(-MAX_OPENED);
+      if (keep) saved.push(key);
+      while (saved.length > MAX_OPENED) opened.call('remove', saved.shift());
       try {
         put('openedChats', JSON.stringify(saved));
       } catch {}
     };
     const chatKey = (ctx) => ctx.thisObject.getField('currentAccount') + ':' + ctx.args[0];
-    const disposeBar = inu.xposed.hookMethod(
-      Controller.getDeclaredMethod('isDialogTranslatable(J)Z'),
-      {
-        after: inu.xposed.routine((ctx) => {
-          if (ctx.returnValue || !selected.getValue().contains(':chatlate.')) return;
-          const translating = ctx.thisObject.translatingDialogs.get(ctx.args[0]);
-          if (
-            (translating !== null && translating.booleanValue()) ||
-            opened.contains('' + ctx.thisObject.currentAccount + ':' + ctx.args[0])
-          )
-            ctx.setReturnValue(true);
-        }),
-      },
-    );
-    // Turning a translation on and pressing Hide are rare, so these stay in JS.
+    hook(Controller.getDeclaredMethod('isDialogTranslatable(J)Z'), {
+      after: inu.xposed.routine((ctx) => {
+        if (ctx.returnValue || !selected.getValue().contains(':chatlate.')) return;
+        const translating = ctx.thisObject.translatingDialogs.get(ctx.args[0]);
+        if (
+          (translating !== null && translating.booleanValue()) ||
+          opened.contains('' + ctx.thisObject.currentAccount + ':' + ctx.args[0])
+        )
+          ctx.setReturnValue(true);
+      }),
+    });
     /** @type {any} */
     const helper = inu.jvm
       .cls('desu.inugram.helpers.translate.TranslateHelper')
       .getStaticField('INSTANCE');
-    const disposeReset = inu.xposed.hookMethod(
-      Controller.getDeclaredMethod('toggleTranslatingDialog(JZ)Z'),
-      {
-        // Clear manual translations before Telegram notifies the chat to show originals.
-        before: inu.xposed.routine((ctx) => {
-          if (
-            ctx.args[1] === false &&
-            selected.getValue().contains(':chatlate.') &&
-            ctx.thisObject.isTranslatingDialog(ctx.args[0])
-          )
-            helper.resetForDialog(ctx.args[0]);
-        }),
+    hook(Controller.getDeclaredMethod('toggleTranslatingDialog(JZ)Z'), {
+      // Clear manual translations before Telegram notifies the chat to show originals.
+      before: inu.xposed.routine((ctx) => {
+        if (
+          ctx.args[1] === false &&
+          selected.getValue().contains(':chatlate.') &&
+          ctx.thisObject.isTranslatingDialog(ctx.args[0])
+        )
+          helper.resetForDialog(ctx.args[0]);
+      }),
+    });
+    // Persist rare user actions on the plugin thread.
+    hook(Controller.getDeclaredMethod('toggleTranslatingDialog(JZ)Z'), {
+      after(ctx) {
+        if (ctx.args[1] !== true) return;
+        const key = chatKey(ctx);
+        opened.call('add', key);
+        setTimeout(() => remember(key, true), 0);
       },
-    );
-    const disposeOpen = inu.xposed.hookMethod(
-      Controller.getDeclaredMethod('toggleTranslatingDialog(JZ)Z'),
-      {
-        after(ctx) {
-          if (ctx.args[1] !== true) return;
-          const key = chatKey(ctx);
-          opened.call('add', key);
-          setTimeout(() => remember(key, true), 0);
-        },
+    });
+    hook(Controller.getDeclaredMethod('setHideTranslateDialog(JZZ)V'), {
+      // Undo on the Hide notice unhides the chat, which brings its bar back. Before Telegram's
+      // own update of the chat, so the bar shows right away.
+      before(ctx) {
+        const hide = ctx.args[1] === true;
+        const key = chatKey(ctx);
+        opened.call(hide ? 'remove' : 'add', key);
+        setTimeout(() => remember(key, !hide), 0);
       },
-    );
-    const disposeHide = inu.xposed.hookMethod(
-      Controller.getDeclaredMethod('setHideTranslateDialog(JZZ)V'),
-      {
-        // Undo on the Hide notice unhides the chat, which brings its bar back. Before Telegram's
-        // own update of the chat, so the bar shows right away.
-        before(ctx) {
-          const hide = ctx.args[1] === true;
-          const key = chatKey(ctx);
-          opened.call(hide ? 'remove' : 'add', key);
-          setTimeout(() => remember(key, !hide), 0);
-        },
-      },
-    );
+    });
     // Follow the panel's visibility, including manually opened bars in same-language chats.
     const updateItem = inu.xposed.routine((ctx) => {
       const chat = ctx.thisObject;
@@ -123,21 +126,9 @@ export function registerRestrictedLanguages() {
       item.setVisibility(visible ? 8 : 0);
     });
     const Chat = inu.jvm.cls('org.telegram.ui.ChatActivity');
-    const disposeItem = inu.xposed.hookMethod(
-      Chat.getDeclaredMethod('updateTranslateItemVisibility'),
-      { after: updateItem },
-    );
-    const disposePanel = inu.xposed.hookMethod(Chat.getDeclaredMethod('updateTopPanel(Z)V'), {
+    hook(Chat.getDeclaredMethod('updateTranslateItemVisibility'), { after: updateItem });
+    hook(Chat.getDeclaredMethod('updateTopPanel(Z)V'), {
       after: updateItem,
-    });
-    inu.onUnload(() => {
-      dispose();
-      disposeBar();
-      disposeOpen();
-      disposeReset();
-      disposeHide();
-      disposeItem();
-      disposePanel();
     });
     // Chats marked translatable before are checked again with these rules.
     const accounts = Number(
@@ -160,6 +151,7 @@ export function registerRestrictedLanguages() {
     });
     inu.jvm.cls('org.telegram.messenger.AndroidUtilities').callStatic('runOnUIThread', recheck);
   } catch {
+    cleanup();
     /* hosts without hooking keep Telegram's own rules */
   }
 }

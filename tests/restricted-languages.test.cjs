@@ -2,7 +2,7 @@ const assert = require('node:assert/strict');
 const { test } = require('node:test');
 const { harness } = require('./helpers/plugin-runtime.cjs');
 
-function chatRuntime(selected = 'installation:chatlate.google') {
+function chatRuntime(selected = 'installation:chatlate.google', options = {}) {
   const hooks = new Map();
   const opened = new Set();
   const resets = [];
@@ -51,10 +51,11 @@ function chatRuntime(selected = 'installation:chatlate.google') {
       // Exercise the bundled routine's logic; Android execution is checked on the phone.
       routine: (spec, captures) =>
         new Function(...spec.captures, `return (${spec.source})`)(...captures),
-      hookMethod: (method, hook) => (
-        hooks.set(method, { ...hooks.get(method), ...hook }),
-        () => {}
-      ),
+      hookMethod(method, hook) {
+        if (method === options.failMethod) throw Error('unsupported method');
+        hooks.set(method, { ...hooks.get(method), ...hook });
+        return () => hooks.delete(method);
+      },
     },
     jvm: {
       runnable: (fn) => fn,
@@ -85,10 +86,18 @@ function chatRuntime(selected = 'installation:chatlate.google') {
       },
     },
   };
-  harness({}, undefined, 'en', native);
-  assert.ok(hooks.has('updateTranslateItemVisibility'));
+  const plugin = harness(options.values ?? {}, undefined, 'en', native);
+  if (!options.failMethod) assert.ok(hooks.has('updateTranslateItemVisibility'));
   return {
     resets,
+    hooks,
+    opened,
+    storage: plugin.storage,
+    open(id) {
+      hooks
+        .get('setHideTranslateDialog(JZZ)V')
+        .before({ thisObject: controller, args: [id, false, false] });
+    },
     stop() {
       hooks.get('toggleTranslatingDialog(JZ)Z').before({
         thisObject: controller,
@@ -177,4 +186,28 @@ test('stopping another service leaves its manual translations untouched', () => 
   chat.translate();
   chat.stop();
   assert.deepEqual(chat.resets, []);
+});
+
+test('remembered chat bars stay bounded in storage and native memory', async () => {
+  const old = Array.from({ length: 205 }, (_, i) => '0:' + i);
+  const chat = chatRuntime(undefined, { values: { openedChats: JSON.stringify(old) } });
+  assert.equal(chat.opened.size, 200);
+  assert.equal(chat.opened.has('0:0'), false);
+  for (let id = 205; id < 410; id++) chat.open(id);
+  await new Promise((resolve) => setTimeout(resolve, 10));
+  assert.equal(chat.opened.size, 200);
+  assert.equal(chat.opened.has('0:409'), true);
+  assert.equal(JSON.parse(chat.storage.get('chatlate.openedChats')).length, 200);
+});
+
+test('an unsupported chat method detaches partially registered translation hooks', () => {
+  const chat = chatRuntime(undefined, { failMethod: 'updateTopPanel(Z)V' });
+  for (const name of [
+    'isLanguageRestricted(Ljava/lang/String;)Z',
+    'isDialogTranslatable(J)Z',
+    'toggleTranslatingDialog(JZ)Z',
+    'setHideTranslateDialog(JZZ)V',
+    'updateTranslateItemVisibility',
+  ])
+    assert.equal(chat.hooks.has(name), false);
 });

@@ -290,7 +290,7 @@ test('custom icons stay centered and consistent while left handles drag and labe
     assert.ok(handle.values.setOnTouchListener);
     assert.equal(label.values.setOnTouchListener, undefined);
     assert.equal(label.values.setOnClickListener, undefined);
-    // Google and Yandex are enabled; Microsoft is available to add.
+    // Google and Yandex are enabled; the remaining services are available to add.
     assert.equal(toggleSymbol(toggle), index < 2 ? '⊖' : '⊕');
     if (row.values.setTag === 'deepl') {
       assert.equal(row.children[2].values.setTag, 'deepl.warning');
