@@ -32,6 +32,7 @@ function harness(options = {}) {
     imports = [];
   const context = {
     Uint8Array,
+    TextDecoder,
     fetch: async (url, init) => {
       requests.push({ url, init });
       if (options.fetch) return options.fetch(url, init);
@@ -63,17 +64,6 @@ function harness(options = {}) {
                   },
                 };
               },
-            };
-          if (name === 'java.lang.String')
-            return class {
-              constructor(bytes, encoding) {
-                assert.equal(encoding, 'UTF-8');
-                this.source = Buffer.from(bytes).toString('utf8');
-              }
-              call(method) {
-                assert.equal(method, 'toString');
-                return this.source;
-              }
             };
           if (name.endsWith('PluginManifestParser'))
             return {

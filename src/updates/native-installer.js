@@ -11,7 +11,7 @@ export function installPackage(bytes, expectedHash, version, signal) {
     Number(byte).toString(16).padStart(2, '0'),
   ).join('');
   if (hash !== expectedHash) throw Error('Package checksum mismatch');
-  const source = new (inu.jvm.cls('java.lang.String'))(bytes, 'UTF-8').call('toString');
+  const source = new TextDecoder().decode(bytes);
   const parser = inu.jvm
     .cls('desu.inugram.core.plugins.PluginManifestParser')
     .getStaticField('INSTANCE');

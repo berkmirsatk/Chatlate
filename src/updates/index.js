@@ -133,6 +133,7 @@ export function createUpdates(invalidate, source = null, translator = null) {
           value: selected.version,
           onClick: () => {},
         }),
+        inu.ui.separator(),
         inu.ui.header('Chatlate ' + selected.version),
         ...notes.items(),
         inu.ui.button({
