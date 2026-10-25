@@ -3,6 +3,12 @@ import { get } from './storage.js';
 
 const messages = {
   en: {
+    draftTranslate: 'Translate draft',
+    draftRestore: 'Restore original draft',
+    draftLanguage: 'Send in',
+    draftTranslating: 'Translating…',
+    draftChanged: 'The draft changed. Your text was kept.',
+    draftReady: 'Translation is ready. Review it before sending.',
     channel: 'Channel',
     github: 'GitHub',
     group: 'Group',
@@ -54,6 +60,12 @@ const messages = {
     httpRateLimited: 'The translation service is limiting requests. Try again later.',
   },
   tr: {
+    draftTranslate: 'Taslağı çevir',
+    draftRestore: 'Orijinal taslağa dön',
+    draftLanguage: 'Gönderim dili',
+    draftTranslating: 'Çevriliyor…',
+    draftChanged: 'Taslak değişti. Yazdıkların korundu.',
+    draftReady: 'Çeviri hazır. Göndermeden önce kontrol et.',
     channel: 'Kanal',
     github: 'GitHub',
     group: 'Grup',

@@ -24,6 +24,8 @@ The broad `account.read(peers)` host grant is used only to resolve the configure
 
 Support links open only after a tap. The fixed USDT TON address is copied only by an explicit button action; the full address is not displayed. Clipboard access is write-only. Chatlate cannot send funds or access a wallet.
 
+Draft translation is initiated from the chat menu and uses the same selected provider and enabled backups. It replaces composer text only when the original chat and draft (including formatting) still match. It never sends a message. The original draft is held in memory for restoration and released when the chat closes or the plugin unloads.
+
 ## Release updates
 
 Opening settings checks `api.github.com` for this repository's latest published stable Release. The request contains no translation text, account credentials or token. Private/unpublished repositories return no available update. GitHub receives ordinary connection metadata such as the requesting IP address. Opening version history or release notes separately fetches the current `CHANGELOG.md` from `main` through the same API host, without authentication or translation data. Notes are displayed as formatted text, not executed. They are translated into the app's language only after a tap on the header's translate icon, through the selected service and its enabled backups, like a message. Requests have a 10-second timeout and a 128,000-character response limit after reading; closing the page cancels them. Failed or private-repository requests show an error and retry action rather than offline notes.

@@ -6,6 +6,7 @@ Run these checks on the final installation file. HTTP/JVM fixtures cannot verify
 
 - [ ] Fresh install: name, author, icon, banner, permissions and automatic Google selection.
 - [ ] Google, Yandex, Microsoft and DeepL translations: nested bold/italic, spoilers, quotes, link labels, code, usernames, custom emoji and line breaks.
+- [ ] Draft translation: choose a language from the chat menu, review and edit the translated draft, then send normally. Verify bold, links, custom emoji and reply context. Restore the unchanged translated draft; edits made during translation or before restoration must never be overwritten. Close the chat during translation and confirm no late write. Cancelling language selection makes no request.
 - [ ] Whole-chat translation without Premium, new incoming messages and excluded-language rules.
 - [ ] Enable all services, drag priorities and toggle individual services. Label taps do not reorder; the last service stays enabled.
 - [ ] Connection tests report enabled services in order with separate status and timing. Closing settings cancels the test.

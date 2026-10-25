@@ -17,6 +17,7 @@ import { registerSettings } from './settings.js';
 import { createProviderSelection } from './provider-selection.js';
 import { registerChatMenu } from './chat-menu.js';
 import { registerProfileTranslation } from './profile-translation.js';
+import { registerDraftTranslation } from './draft-translation.js';
 import { registerKeepOriginal } from './keep-original.js';
 import { registerRestrictedLanguages } from './restricted-languages.js';
 
@@ -29,6 +30,7 @@ const providers = [
 const selection = createProviderSelection(providers);
 const chatMenu = registerChatMenu(providers, selection);
 registerProfileTranslation(providers, selection);
+registerDraftTranslation(providers, selection);
 registerKeepOriginal();
 registerRestrictedLanguages();
 for (const provider of providers) {

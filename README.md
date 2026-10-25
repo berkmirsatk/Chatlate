@@ -20,6 +20,7 @@
 - **Formatting stays** – bold, italics, links, quotes and spoilers keep their place; code, usernames and custom emoji are never changed.
 - **Mixed-language chats** – each message is translated from its own language.
 - **Google, Yandex, Microsoft and DeepL** – use any of them, drag them into your preferred order, and let the next one take over within seconds if a service is unavailable. A short note in the chat tells you when it does.
+- **Translate drafts** – choose a target language from the chat menu, review the translation in the composer and send it yourself. Restore the original draft before editing the translation.
 - **Switch in the chat** – pick another service from the translate bar's menu.
 - **Descriptions in place** – group, channel and profile descriptions are translated right where they are.
 - **Original below** – with Inugram's Show original text setting on, whole-chat translations keep the original under them too.

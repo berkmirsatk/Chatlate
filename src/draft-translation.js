@@ -1,0 +1,246 @@
+import { createTranslator } from './translation.js';
+import { withFallback } from './fallback.js';
+import { get, put } from './storage.js';
+import { t } from './i18n.js';
+
+/** Translate drafts in the native composer; sending remains the user's action.
+ * @param {import('./provider.js').Provider[]} providers
+ * @param {ReturnType<typeof import('./provider-selection.js').createProviderSelection>} selection */
+export function registerDraftTranslation(providers, selection) {
+  if (!inu.registerChatAction) return;
+  const states = new Map();
+  const disposers = [];
+  let disposed = false;
+  const utilities = inu.jvm.cls('org.telegram.messenger.AndroidUtilities');
+  const onUi = (fn) =>
+    new Promise((resolve, reject) => {
+      utilities.callStatic(
+        'runOnUIThread',
+        inu.jvm.runnable(() => {
+          try {
+            const result = fn();
+            setTimeout(() => resolve(result), 0);
+          } catch (error) {
+            setTimeout(() => reject(error), 0);
+          }
+        }),
+      );
+    });
+  const current = (ctx) => {
+    const chat = inu.android.getCurrentFragment();
+    if (
+      !chat ||
+      Number(chat.call('getCurrentAccount')) !== ctx.account.id ||
+      Number(chat.call('getDialogId')) !== ctx.dialogId
+    )
+      return null;
+    return chat;
+  };
+  // Work on copies: entity extraction must not mutate the editable draft.
+  const read = (chat) => {
+    const composer = chat.getField('chatActivityEnterView');
+    if (!composer || chat.getField('editingMessageObject') !== null) return null;
+    const edit = composer.call('getEditField');
+    const value = composer.call('getFieldText');
+    if (!edit || value === null) return null;
+    const original = new (inu.jvm.cls('android.text.SpannableStringBuilder'))(value);
+    const arrays = inu.jvm.cls('java.lang.reflect.Array');
+    const input = arrays.callStatic('newInstance', inu.jvm.cls('java.lang.CharSequence'), 1);
+    arrays.callStatic(
+      'set',
+      input,
+      0,
+      new (inu.jvm.cls('android.text.SpannableStringBuilder'))(original),
+    );
+    const entities = inu.jvm
+      .cls('org.telegram.messenger.MediaDataController')
+      .callStatic('getInstance', chat.call('getCurrentAccount'))
+      .call('getEntities', input, true, false);
+    const content = new (inu.jvm.cls('org.telegram.tgnet.TLRPC$TL_textWithEntities'))();
+    content.setField('text', String(original.call('toString')));
+    content.setField('entities', entities || new (inu.jvm.cls('java.util.ArrayList'))());
+    const text = /** @type {TextWithEntities} */ (inu.jvm.toTl(content));
+    return { composer, edit, original, text, signature: JSON.stringify(text) };
+  };
+  const idOf = (chat) => Number(chat.call('getClassGuid'));
+  function forget(id) {
+    const state = states.get(id);
+    states.delete(id);
+    if (state?.controller) setTimeout(() => state.controller.abort(), 0);
+  }
+  async function open(ctx) {
+    let owned;
+    try {
+      const chat = current(ctx);
+      if (!chat) return;
+      const snapshot = await onUi(() => read(chat));
+      if (!snapshot?.text.text.trim() || disposed) return;
+      const id = idOf(chat);
+      const active = current(ctx);
+      if (!active || idOf(active) !== id) return;
+      forget(id);
+      if (states.size >= 20) forget(states.keys().next().value);
+      const state = {
+        controller: new AbortController(),
+        original: snapshot.original,
+        signature: '',
+        done: false,
+      };
+      states.set(id, state);
+      owned = { id, state };
+      const languages = inu.jvm
+        .cls('org.telegram.messenger.TranslateController')
+        .callStatic('getLanguages');
+      const options = [];
+      for (let i = 0; i < Number(languages.call('size')); i++) {
+        const item = languages.call('get', i);
+        options.push({
+          code: String(item.getField('code')),
+          name: String(item.getField('displayName')),
+        });
+      }
+      const saved = get('draft.language', 'en');
+      const index = await inu.ui.chooser({
+        title: t('draftLanguage'),
+        items: options.map((item) => item.name),
+        selected: Math.max(
+          0,
+          options.findIndex((item) => item.code === saved),
+        ),
+      });
+      const valid = () => !disposed && states.get(id) === state && !state.controller.signal.aborted;
+      if (!valid()) return;
+      if (index === null) {
+        forget(id);
+        return;
+      }
+      const activeChat = current(ctx);
+      if (!activeChat || idOf(activeChat) !== id) {
+        forget(id);
+        return;
+      }
+      const target = options[index].code;
+      put('draft.language', target);
+      inu.ui.toast(t('draftTranslating'));
+      const primary = providers[selection.read().index];
+      const [result] = await createTranslator(withFallback(primary, providers)).translate({
+        texts: [snapshot.text],
+        from: [null],
+        to: target,
+        signal: state.controller.signal,
+      });
+      if (!valid()) return;
+      const applied = await onUi(() => {
+        const active = current(ctx);
+        if (!valid() || !active || idOf(active) !== id) return false;
+        const latest = read(chat);
+        if (!latest || latest.signature !== snapshot.signature) return false;
+        const formatted = inu.jvm
+          .cls('desu.inugram.helpers.plugins.ui.PluginText')
+          .getStaticField('INSTANCE')
+          .call(
+            'formatted',
+            result.text,
+            JSON.stringify(result.entities ?? []),
+            snapshot.edit.call('getPaint').call('getFontMetricsInt'),
+          );
+        snapshot.composer.call('setFieldText', formatted);
+        snapshot.edit.call('setSelection', result.text.length);
+        state.signature = read(chat)?.signature ?? '';
+        state.done = true;
+        return true;
+      });
+      if (!valid()) return;
+      if (!applied) {
+        forget(id);
+        inu.ui.toast(t('draftChanged'));
+        return;
+      }
+      inu.ui.toast(t('draftReady'));
+    } catch (error) {
+      const aborted =
+        owned?.state.controller.signal.aborted || (owned && states.get(owned.id) !== owned.state);
+      if (owned && states.get(owned.id) === owned.state) forget(owned.id);
+      if (!disposed && !aborted) inu.ui.toast(error?.message || t('connectionFailed'));
+    }
+  }
+  async function restore(ctx) {
+    try {
+      const chat = current(ctx);
+      if (!chat) return;
+      const id = idOf(chat),
+        state = states.get(id);
+      if (!state?.done) return;
+      const restored = await onUi(() => {
+        const active = current(ctx);
+        if (disposed || !active || idOf(active) !== id) return false;
+        const latest = read(chat);
+        if (!latest || states.get(id) !== state || latest.signature !== state.signature)
+          return false;
+        latest.composer.call('setFieldText', state.original);
+        return true;
+      });
+      if (restored) forget(id);
+      else inu.ui.toast(t('draftChanged'));
+    } catch {
+      inu.ui.toast(t('draftChanged'));
+    }
+  }
+  disposers.push(
+    inu.registerChatAction({
+      id: 'draft.translate',
+      text: () => t('draftTranslate'),
+      visible: (ctx) =>
+        onUi(() => {
+          const chat = current(ctx);
+          const composer = chat?.getField('chatActivityEnterView');
+          return (
+            !!chat &&
+            !!composer &&
+            chat.getField('editingMessageObject') === null &&
+            composer.call('getFieldText') !== null
+          );
+        }).catch(() => false),
+      callback: (ctx) => {
+        void open(ctx);
+      },
+    }),
+  );
+  disposers.push(
+    inu.registerChatAction({
+      id: 'draft.restore',
+      text: () => t('draftRestore'),
+      visible: (ctx) => {
+        try {
+          const chat = current(ctx);
+          return !!chat && !!states.get(idOf(chat))?.done;
+        } catch {
+          return false;
+        }
+      },
+      callback: (ctx) => {
+        void restore(ctx);
+      },
+    }),
+  );
+  try {
+    disposers.push(
+      inu.xposed.hookMethod(
+        inu.jvm.cls('org.telegram.ui.ChatActivity').getDeclaredMethod('onFragmentDestroy'),
+        {
+          before(ctx) {
+            forget(idOf(ctx.thisObject));
+          },
+        },
+      ),
+    );
+  } catch {
+    /* Current-fragment and draft checks still prevent stale writes. */
+  }
+  inu.onUnload(() => {
+    disposed = true;
+    for (const state of states.values()) state.controller.abort();
+    states.clear();
+    for (const dispose of disposers) dispose();
+  });
+}
