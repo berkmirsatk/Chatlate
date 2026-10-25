@@ -70,6 +70,24 @@ export function registerRestrictedLanguages() {
       },
     );
     // Turning a translation on and pressing Hide are rare, so these stay in JS.
+    /** @type {any} */
+    const helper = inu.jvm
+      .cls('desu.inugram.helpers.translate.TranslateHelper')
+      .getStaticField('INSTANCE');
+    const disposeReset = inu.xposed.hookMethod(
+      Controller.getDeclaredMethod('toggleTranslatingDialog(JZ)Z'),
+      {
+        // Clear manual translations before Telegram notifies the chat to show originals.
+        before: inu.xposed.routine((ctx) => {
+          if (
+            ctx.args[1] === false &&
+            selected.getValue().contains(':chatlate.') &&
+            ctx.thisObject.isTranslatingDialog(ctx.args[0])
+          )
+            helper.resetForDialog(ctx.args[0]);
+        }),
+      },
+    );
     const disposeOpen = inu.xposed.hookMethod(
       Controller.getDeclaredMethod('toggleTranslatingDialog(JZ)Z'),
       {
@@ -116,6 +134,7 @@ export function registerRestrictedLanguages() {
       dispose();
       disposeBar();
       disposeOpen();
+      disposeReset();
       disposeHide();
       disposeItem();
       disposePanel();

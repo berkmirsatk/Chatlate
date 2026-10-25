@@ -5,6 +5,7 @@ const { harness } = require('./helpers/plugin-runtime.cjs');
 function chatRuntime(selected = 'installation:chatlate.google') {
   const hooks = new Map();
   const opened = new Set();
+  const resets = [];
   let hidden = false,
     detected = false,
     translating = false,
@@ -20,6 +21,7 @@ function chatRuntime(selected = 'installation:chatlate.google') {
     translatingDialogs: {
       get: () => (translating ? { booleanValue: () => true } : null),
     },
+    isTranslatingDialog: () => translating,
     isTranslateDialogHidden: () => hidden,
     isDialogTranslatable() {
       const ctx = {
@@ -49,7 +51,10 @@ function chatRuntime(selected = 'installation:chatlate.google') {
       // Exercise the bundled routine's logic; Android execution is checked on the phone.
       routine: (spec, captures) =>
         new Function(...spec.captures, `return (${spec.source})`)(...captures),
-      hookMethod: (method, hook) => (hooks.set(method, hook), () => {}),
+      hookMethod: (method, hook) => (
+        hooks.set(method, { ...hooks.get(method), ...hook }),
+        () => {}
+      ),
     },
     jvm: {
       runnable: (fn) => fn,
@@ -66,6 +71,7 @@ function chatRuntime(selected = 'installation:chatlate.google') {
         return {
           getDeclaredMethod: (descriptor) => descriptor,
           getStaticField(field) {
+            if (field === 'INSTANCE') return { resetForDialog: (id) => resets.push(id) };
             if (field === 'TRANSLATION_PROVIDER') return config;
             if (field === 'MAX_ACCOUNT_COUNT') return 0;
             throw Error(field);
@@ -82,6 +88,14 @@ function chatRuntime(selected = 'installation:chatlate.google') {
   harness({}, undefined, 'en', native);
   assert.ok(hooks.has('updateTranslateItemVisibility'));
   return {
+    resets,
+    stop() {
+      hooks.get('toggleTranslatingDialog(JZ)Z').before({
+        thisObject: controller,
+        args: [-1001, false],
+      });
+      translating = false;
+    },
     panel(value) {
       panelVisible = value;
       hooks.get('updateTopPanel(Z)V').after({ thisObject: chat });
@@ -145,4 +159,22 @@ test('a manually visible bar hides Translate even when the chat is not detected 
   assert.equal(chat.menu(), 8);
   assert.equal(chat.panel(false), 0);
   assert.equal(chat.panel(true), 8);
+});
+
+test('showing originals clears manual translations only for the active chat', () => {
+  const chat = chatRuntime();
+  chat.stop();
+  assert.deepEqual(chat.resets, []);
+  chat.translate();
+  chat.stop();
+  assert.deepEqual(chat.resets, [-1001]);
+  chat.stop();
+  assert.deepEqual(chat.resets, [-1001]);
+});
+
+test('stopping another service leaves its manual translations untouched', () => {
+  const chat = chatRuntime('telegram');
+  chat.translate();
+  chat.stop();
+  assert.deepEqual(chat.resets, []);
 });
