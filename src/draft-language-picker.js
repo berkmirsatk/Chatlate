@@ -5,13 +5,18 @@ export function createDraftLanguagePicker() {
   let active, classes;
   const utilities = inu.jvm.cls('org.telegram.messenger.AndroidUtilities');
   const post = (fn) => utilities.callStatic('runOnUIThread', inu.jvm.runnable(fn));
-  /** @param {string | null} code */
-  function finish(code = null) {
+  /** @param {string | null} code @param {boolean} closeSheet */
+  function finish(code = null, closeSheet = true) {
     const state = active;
     active = undefined;
     if (!state) return;
     setTimeout(() => state.resolve(code), 0);
-    state.sheet?.call('dismiss');
+    if (closeSheet && state.sheet) {
+      // BottomSheet invokes its hide listener synchronously. Detach it before calling
+      // dismiss from a JVM callback, otherwise QuickJS would be entered recursively.
+      state.sheet.call('setOnHideListener', null);
+      state.sheet.call('dismiss');
+    }
   }
   function prepare() {
     if (classes) return;
@@ -73,7 +78,7 @@ export function createDraftLanguagePicker() {
           });
         signal?.addEventListener('abort', abort);
         const dismiss = inu.jvm.runnable(() => {
-          if (active === state) finish();
+          if (active === state) finish(null, false);
         });
         post(() => {
           try {
@@ -130,6 +135,7 @@ export function createDraftLanguagePicker() {
             layout.call('addView', scroll);
             const builder = new (inu.jvm.cls('org.telegram.ui.ActionBar.BottomSheet$Builder'))(
               context,
+              true,
             );
             builder.call('setTitle', title);
             builder.call('setCustomView', layout);
@@ -143,6 +149,7 @@ export function createDraftLanguagePicker() {
           } catch (error) {
             if (active === state) {
               active = undefined;
+              state.sheet?.call('setOnHideListener', null);
               state.sheet?.call('dismiss');
             }
             signal?.removeEventListener('abort', abort);

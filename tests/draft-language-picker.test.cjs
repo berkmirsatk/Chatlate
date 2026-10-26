@@ -13,6 +13,16 @@ const code = buildSync({
   globalName: 'Picker',
 }).outputFiles[0].text;
 function runtime() {
+  let entered = false;
+  const enter = (fn, ...args) => {
+    assert.equal(entered, false, 'plugin engine is re-entered');
+    entered = true;
+    try {
+      return fn(...args);
+    } finally {
+      entered = false;
+    }
+  };
   const views = [],
     sheets = [];
   class View {
@@ -29,6 +39,9 @@ function runtime() {
         return sheet;
       }
       if (method === 'getTag') return this.values.setTag;
+      if (method === 'setOnHideListener' && args[0] === null)
+        this.values.setOnDismissListener = null;
+      if (method === 'dismiss') this.values.setOnDismissListener?.();
       this.values[method] = args[0];
       return this;
     }
@@ -40,7 +53,10 @@ function runtime() {
       info: () => ({ language: 'en' }),
       android: { getCurrentFragment: () => ({ call: () => 'activity' }) },
       jvm: {
-        runnable: (fn) => fn,
+        runnable:
+          (fn) =>
+          (...args) =>
+            enter(fn, ...args),
         defineClass: (spec) =>
           class {
             spec = spec;
@@ -61,7 +77,13 @@ function runtime() {
     { code: 'tr', name: 'Türkçe' },
     { code: 'en', name: 'English' },
   ];
-  return { views, sheets, picker, choose: () => picker.choose(options, 'tr') };
+  return {
+    views,
+    sheets,
+    picker,
+    choose: () => picker.choose(options, 'tr'),
+    click: (view) => enter(view.values.setOnClickListener.spec.methods.onClick.body, null, view),
+  };
 }
 
 test('language search filters native rows and selecting one resolves its code', async () => {
@@ -72,7 +94,7 @@ test('language search filters native rows and selecting one resolves its code', 
   input.values.addTextChangedListener.spec.methods.onTextChanged.body(null, 'eng', 0, 0, 3);
   assert.equal(rows[0].values.setVisibility, 8);
   assert.equal(rows[1].values.setVisibility, 0);
-  rows[1].values.setOnClickListener.spec.methods.onClick.body(null, rows[1]);
+  r.click(rows[1]);
   assert.equal(await result, 'en');
   assert.ok(r.sheets[0].calls.includes('dismiss'));
 });
@@ -85,7 +107,7 @@ test('dismissing an old sheet cannot cancel a newer language selection', async (
   assert.equal(await first, null);
   oldDismiss();
   const rows = r.views.filter((view) => view.values.setTag === 'tr');
-  rows[1].values.setOnClickListener.spec.methods.onClick.body(null, rows[1]);
+  r.click(rows[1]);
   assert.equal(await second, 'tr');
 });
 
@@ -94,4 +116,12 @@ test('disposing the picker resolves cancellation and dismisses its sheet', async
   const result = r.choose();
   r.picker.dispose();
   assert.equal(await result, null);
+});
+
+test('a native dismissal resolves cancellation without recursively dismissing again', async () => {
+  const r = runtime();
+  const result = r.choose();
+  r.sheets[0].call('dismiss');
+  assert.equal(await result, null);
+  assert.equal(r.sheets[0].calls.filter((method) => method === 'dismiss').length, 1);
 });
