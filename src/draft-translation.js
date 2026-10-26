@@ -1,3 +1,4 @@
+import { createDraftLanguagePicker } from './draft-language-picker.js';
 import { registerDraftSendMenu } from './draft-send-menu.js';
 import { createTranslator } from './translation.js';
 import { withFallback } from './fallback.js';
@@ -10,6 +11,7 @@ import { t } from './i18n.js';
 export function registerDraftTranslation(providers, selection) {
   if (!inu.registerChatAction) return { refresh() {} };
   const states = new Map();
+  const languagePicker = createDraftLanguagePicker();
   const disposers = [];
   let disposed = false;
   const utilities = inu.jvm.cls('org.telegram.messenger.AndroidUtilities');
@@ -101,17 +103,10 @@ export function registerDraftTranslation(providers, selection) {
         });
       }
       const saved = get('draft.language', 'en');
-      const index = await inu.ui.chooser({
-        title: t('draftLanguage'),
-        items: options.map((item) => item.name),
-        selected: Math.max(
-          0,
-          options.findIndex((item) => item.code === saved),
-        ),
-      });
+      const target = await languagePicker.choose(options, saved, state.controller.signal);
       const valid = () => !disposed && states.get(id) === state && !state.controller.signal.aborted;
       if (!valid()) return;
-      if (index === null) {
+      if (target === null) {
         forget(id);
         return;
       }
@@ -120,7 +115,6 @@ export function registerDraftTranslation(providers, selection) {
         forget(id);
         return;
       }
-      const target = options[index].code;
       put('draft.language', target);
       inu.ui.toast(t('draftTranslating'));
       const primary = providers[selection.read().index];
@@ -131,20 +125,22 @@ export function registerDraftTranslation(providers, selection) {
         signal: state.controller.signal,
       });
       if (!valid()) return;
+      const nativeResult = inu.jvm.fromTl({
+        _: 'textWithEntities',
+        text: result.text,
+        entities: result.entities ?? [],
+      });
       const applied = await onUi(() => {
         const active = current(ctx);
         if (!valid() || !active || idOf(active) !== id) return false;
         const latest = read(chat);
         if (!latest || latest.signature !== snapshot.signature) return false;
-        const formatted = inu.jvm
-          .cls('desu.inugram.helpers.plugins.ui.PluginText')
-          .getStaticField('INSTANCE')
-          .call(
-            'formatted',
-            result.text,
-            JSON.stringify(result.entities ?? []),
-            snapshot.edit.call('getPaint').call('getFontMetricsInt'),
-          );
+        const entities = nativeResult.getField('entities');
+        const buffer = new (inu.jvm.cls('android.text.SpannableStringBuilder'))(result.text);
+        const messages = inu.jvm.cls('org.telegram.messenger.MessageObject');
+        messages.callStatic('addEntitiesToText', buffer, entities, false, false, false, false);
+        const metrics = snapshot.edit.call('getPaint').call('getFontMetricsInt');
+        const formatted = messages.callStatic('replaceAnimatedEmoji', buffer, entities, metrics);
         snapshot.composer.call('setFieldText', formatted);
         snapshot.edit.call('setSelection', result.text.length);
         state.signature = read(chat)?.signature ?? '';
@@ -238,6 +234,7 @@ export function registerDraftTranslation(providers, selection) {
   });
   inu.onUnload(() => {
     disposed = true;
+    languagePicker.dispose();
     for (const state of states.values()) state.controller.abort();
     states.clear();
     for (const dispose of disposers) dispose();

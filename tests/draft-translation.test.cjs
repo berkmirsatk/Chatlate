@@ -1,18 +1,34 @@
 const assert = require('node:assert/strict');
-const { test } = require('node:test');
+const { test, before } = require('node:test');
 const vm = require('node:vm');
-const { buildSync } = require('esbuild');
+const { build } = require('esbuild');
 const { waitUntil } = require('./helpers/plugin-runtime.cjs');
-const code = buildSync({
-  stdin: {
-    contents: "export { registerDraftTranslation } from './src/draft-translation.js';",
-    resolveDir: process.cwd(),
-  },
-  bundle: true,
-  write: false,
-  format: 'iife',
-  globalName: 'Draft',
-}).outputFiles[0].text;
+let code;
+before(async () => {
+  code = (
+    await build({
+      stdin: {
+        contents: "export { registerDraftTranslation } from './src/draft-translation.js';",
+        resolveDir: process.cwd(),
+      },
+      plugins: [
+        {
+          name: 'native-language-picker',
+          setup(build) {
+            build.onLoad({ filter: /draft-language-picker\.js$/ }, () => ({
+              contents: `export function createDraftLanguagePicker() { return { choose: async (options) => { const index = await inu.ui.chooser({}); return index === null ? null : options[index].code; }, dispose() {} }; }`,
+              loader: 'js',
+            }));
+          },
+        },
+      ],
+      bundle: true,
+      write: false,
+      format: 'iife',
+      globalName: 'Draft',
+    })
+  ).outputFiles[0].text;
+});
 
 function runtime(handler = async (texts) => texts.map((text) => text.replace('Hello', 'Merhaba'))) {
   const actions = new Map(),
@@ -73,7 +89,10 @@ function runtime(handler = async (texts) => texts.map((text) => text.replace('He
     jvm: {
       runnable: (fn) => fn,
       toTl: (object) => object.fields,
+      fromTl: (object) => ({ getField: (key) => object[key] }),
       cls(name) {
+        if (name.startsWith('desu.inugram.helpers.plugins'))
+          throw Error('engine internals forbidden');
         if (name === 'android.text.SpannableStringBuilder') return Text;
         if (name.endsWith('$TL_textWithEntities'))
           return class {
@@ -95,6 +114,11 @@ function runtime(handler = async (texts) => texts.map((text) => text.replace('He
             },
           }),
           callStatic(method, ...args) {
+            if (method === 'addEntitiesToText') {
+              args[0].entities = structuredClone(args[1]);
+              return;
+            }
+            if (method === 'replaceAnimatedEmoji') return args[0];
             if (method === 'runOnUIThread') return args[0]();
             if (method === 'newInstance') return [];
             if (method === 'set') {

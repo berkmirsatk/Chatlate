@@ -19,7 +19,7 @@ Run `npm run format` after editing code. The installer preserves indentation and
 | Modules | Responsibility |
 | --- | --- |
 | `providers/`, `http.js`, `cache.js`, `limits.js` | HTTP adapters, bounded queues, rate limits and caching |
-| `draft-translation.js`, `draft-send-menu.js` | Composer translation, send-menu integration, language selection and guarded restoration |
+| `draft-translation.js`, `draft-send-menu.js`, `draft-language-picker.js` | Composer translation, send-menu integration, language selection and guarded restoration |
 | `formatting.js`, `translation.js` | Telegram entities, protected spans and rebuilt offsets |
 | `fallback.js`, `provider-selection.js`, `provider-editor.js` | Provider order, native selection and editing |
 | `settings.js`, native view modules | Settings composition, language controls, dragging and status |
