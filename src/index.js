@@ -30,7 +30,7 @@ const providers = [
 const selection = createProviderSelection(providers);
 const chatMenu = registerChatMenu(providers, selection);
 registerProfileTranslation(providers, selection);
-registerDraftTranslation(providers, selection);
+const draftTranslation = registerDraftTranslation(providers, selection);
 registerKeepOriginal();
 registerRestrictedLanguages();
 for (const provider of providers) {
@@ -51,4 +51,5 @@ const refreshDescription = registerDescription();
 registerSettings(providers, selection, () => {
   refreshDescription();
   chatMenu.refresh();
+  draftTranslation.refresh();
 });

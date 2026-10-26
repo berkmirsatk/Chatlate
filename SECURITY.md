@@ -24,7 +24,7 @@ The broad `account.read(peers)` host grant is used only to resolve the configure
 
 Support links open only after a tap. The fixed USDT TON address is copied only by an explicit button action; the full address is not displayed. Clipboard access is write-only. Chatlate cannot send funds or access a wallet.
 
-Draft translation is initiated from the chat menu and uses the same selected provider and enabled backups. It replaces composer text only when the original chat and draft (including formatting) still match. It never sends a message. The original draft is held in memory for restoration and released when the chat closes or the plugin unloads.
+Draft translation is initiated from the send-button long-press menu or chat menu and uses the same selected provider and enabled backups. It replaces composer text only when the original chat and draft (including formatting) still match. It never sends a message. The original draft is held in memory for restoration and released when the chat closes or the plugin unloads.
 
 ## Release updates
 

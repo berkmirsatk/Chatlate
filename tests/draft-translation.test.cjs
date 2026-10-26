@@ -64,7 +64,12 @@ function runtime(handler = async (texts) => texts.map((text) => text.replace('He
         return chosen;
       },
     },
-    xposed: { hookMethod: (_method, hook) => ((destroy = hook.before), () => {}) },
+    xposed: {
+      hookMethod: (method, hook) => {
+        if (method === 'onFragmentDestroy') destroy = hook.before;
+        return () => {};
+      },
+    },
     jvm: {
       runnable: (fn) => fn,
       toTl: (object) => object.fields,
@@ -252,4 +257,9 @@ test('unloading cancels outstanding draft work', async () => {
   await new Promise((resolve) => setTimeout(resolve, 20));
   assert.equal(r.draft.text, 'Hello');
   assert.equal(r.actions.size, 0);
+});
+
+test('the chat translation action is not hidden behind a UI-thread visibility request', () => {
+  const r = runtime();
+  assert.equal(r.actions.get('draft.translate').visible, undefined);
 });

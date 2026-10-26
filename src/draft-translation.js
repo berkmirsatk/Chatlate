@@ -1,3 +1,4 @@
+import { registerDraftSendMenu } from './draft-send-menu.js';
 import { createTranslator } from './translation.js';
 import { withFallback } from './fallback.js';
 import { get, put } from './storage.js';
@@ -7,7 +8,7 @@ import { t } from './i18n.js';
  * @param {import('./provider.js').Provider[]} providers
  * @param {ReturnType<typeof import('./provider-selection.js').createProviderSelection>} selection */
 export function registerDraftTranslation(providers, selection) {
-  if (!inu.registerChatAction) return;
+  if (!inu.registerChatAction) return { refresh() {} };
   const states = new Map();
   const disposers = [];
   let disposed = false;
@@ -190,17 +191,6 @@ export function registerDraftTranslation(providers, selection) {
     inu.registerChatAction({
       id: 'draft.translate',
       text: () => t('draftTranslate'),
-      visible: (ctx) =>
-        onUi(() => {
-          const chat = current(ctx);
-          const composer = chat?.getField('chatActivityEnterView');
-          return (
-            !!chat &&
-            !!composer &&
-            chat.getField('editingMessageObject') === null &&
-            composer.call('getFieldText') !== null
-          );
-        }).catch(() => false),
       callback: (ctx) => {
         void open(ctx);
       },
@@ -237,10 +227,20 @@ export function registerDraftTranslation(providers, selection) {
   } catch {
     /* Current-fragment and draft checks still prevent stale writes. */
   }
+  const sendMenu = registerDraftSendMenu({
+    translate: (ctx) => {
+      void open(ctx);
+    },
+    restore: (ctx) => {
+      void restore(ctx);
+    },
+    canRestore: (chat) => !!states.get(idOf(chat))?.done,
+  });
   inu.onUnload(() => {
     disposed = true;
     for (const state of states.values()) state.controller.abort();
     states.clear();
     for (const dispose of disposers) dispose();
   });
+  return sendMenu;
 }
