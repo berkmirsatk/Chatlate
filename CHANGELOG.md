@@ -1,5 +1,21 @@
 # Changelog
 
+## 1.2.0
+
+### Translation
+
+- Translate your draft into a chosen language by long-pressing Send.
+
+### Providers
+
+- Add DeepL translation support. Usage may be temporarily limited.
+- Improve handling of large Google translation requests.
+
+### Improvements and fixes
+
+- Fix in-app update installation.
+- Various fixes and improvements to translation and settings.
+
 ## 1.1.0
 
 ### Providers
