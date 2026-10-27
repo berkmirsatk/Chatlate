@@ -9,9 +9,9 @@ import { t } from './i18n.js';
  * @param {import('./provider.js').Provider[]} providers
  * @param {ReturnType<typeof import('./provider-selection.js').createProviderSelection>} selection */
 export function registerDraftTranslation(providers, selection) {
-  if (!inu.registerChatAction) return { refresh() {} };
+  if (!inu.android?.getCurrentFragment || !inu.onUnload) return { refresh() {} };
   const states = new Map();
-  const languagePicker = createDraftLanguagePicker();
+  let languagePicker;
   const disposers = [];
   let disposed = false;
   const utilities = inu.jvm.cls('org.telegram.messenger.AndroidUtilities');
@@ -81,16 +81,18 @@ export function registerDraftTranslation(providers, selection) {
       const id = idOf(chat);
       const active = current(ctx);
       if (!active || idOf(active) !== id) return;
+      const prior = states.get(id);
+      const previous = prior?.done && prior.signature === snapshot.signature ? prior : undefined;
       forget(id);
       if (states.size >= 20) forget(states.keys().next().value);
       const state = {
         controller: new AbortController(),
-        original: snapshot.original,
+        original: previous?.original ?? snapshot.original,
         signature: '',
         done: false,
       };
       states.set(id, state);
-      owned = { id, state };
+      owned = { id, state, previous };
       const languages = inu.jvm
         .cls('org.telegram.messenger.TranslateController')
         .callStatic('getLanguages');
@@ -103,11 +105,13 @@ export function registerDraftTranslation(providers, selection) {
         });
       }
       const saved = get('draft.language', 'en');
+      languagePicker ??= createDraftLanguagePicker();
       const target = await languagePicker.choose(options, saved, state.controller.signal);
       const valid = () => !disposed && states.get(id) === state && !state.controller.signal.aborted;
       if (!valid()) return;
       if (target === null) {
         forget(id);
+        if (previous) states.set(id, previous);
         return;
       }
       const activeChat = current(ctx);
@@ -157,7 +161,10 @@ export function registerDraftTranslation(providers, selection) {
     } catch (error) {
       const aborted =
         owned?.state.controller.signal.aborted || (owned && states.get(owned.id) !== owned.state);
-      if (owned && states.get(owned.id) === owned.state) forget(owned.id);
+      if (owned && states.get(owned.id) === owned.state) {
+        forget(owned.id);
+        if (!disposed && owned.previous) states.set(owned.id, owned.previous);
+      }
       if (!disposed && !aborted) inu.ui.toast(error?.message || t('connectionFailed'));
     }
   }
@@ -208,7 +215,7 @@ export function registerDraftTranslation(providers, selection) {
   });
   inu.onUnload(() => {
     disposed = true;
-    languagePicker.dispose();
+    languagePicker?.dispose();
     for (const state of states.values()) state.controller.abort();
     states.clear();
     for (const dispose of disposers) dispose();

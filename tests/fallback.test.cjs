@@ -1,6 +1,7 @@
 const assert = require('node:assert/strict');
 const { test } = require('node:test');
 const {
+  waitUntil,
   googleReply,
   harness,
   summaryValue,
@@ -165,7 +166,9 @@ test('connection test checks each enabled service directly after a failed primar
     .items()
     .find((row) => row.id === 'test')
     .onClick();
-  await new Promise((resolve) => setTimeout(resolve, 180));
+  await waitUntil(
+    () => h.page.items().find((row) => row.id === 'test').text === 'Bağlantıyı test et',
+  );
   assert.deepEqual(calls, ['Google', 'Yandex']);
   const rows = h.page.items();
   assert.ok(

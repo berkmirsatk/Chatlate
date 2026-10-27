@@ -291,3 +291,22 @@ test('draft actions are available only through the send menu', () => {
   const r = runtime();
   assert.equal(r.actions.size, 0);
 });
+
+for (const failure of [false, true]) {
+  test(`a ${failure ? 'failed' : 'cancelled'} second translation preserves the original draft`, async () => {
+    let calls = 0;
+    const r = runtime(async () => {
+      if (++calls > 1) throw new Error('Unavailable');
+      return ['Merhaba'];
+    });
+    r.translate();
+    await waitUntil(() => r.canRestore());
+    if (!failure) r.choose(null);
+    r.translate();
+    await waitUntil(() => r.choices === 2);
+    if (failure) await waitUntil(() => r.notices.includes('Unavailable'));
+    await waitUntil(() => r.canRestore());
+    r.restore();
+    await waitUntil(() => r.draft.text === 'Hello');
+  });
+}
