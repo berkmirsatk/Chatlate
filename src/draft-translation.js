@@ -183,32 +183,6 @@ export function registerDraftTranslation(providers, selection) {
       inu.ui.toast(t('draftChanged'));
     }
   }
-  disposers.push(
-    inu.registerChatAction({
-      id: 'draft.translate',
-      text: () => t('draftTranslate'),
-      callback: (ctx) => {
-        void open(ctx);
-      },
-    }),
-  );
-  disposers.push(
-    inu.registerChatAction({
-      id: 'draft.restore',
-      text: () => t('draftRestore'),
-      visible: (ctx) => {
-        try {
-          const chat = current(ctx);
-          return !!chat && !!states.get(idOf(chat))?.done;
-        } catch {
-          return false;
-        }
-      },
-      callback: (ctx) => {
-        void restore(ctx);
-      },
-    }),
-  );
   try {
     disposers.push(
       inu.xposed.hookMethod(

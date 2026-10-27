@@ -59,7 +59,7 @@ export function registerDraftSendMenu(actions) {
       dispose();
     });
   } catch {
-    /* The standard chat action remains available. */
+    /* Unsupported hosts omit the draft actions. */
   }
   return { refresh };
 }

@@ -15,6 +15,10 @@ before(async () => {
         {
           name: 'native-language-picker',
           setup(build) {
+            build.onLoad({ filter: /draft-send-menu\.js$/ }, () => ({
+              contents: `export function registerDraftSendMenu(handlers) { inu.draftMenu = handlers; return { refresh() {} }; }`,
+              loader: 'js',
+            }));
             build.onLoad({ filter: /draft-language-picker\.js$/ }, () => ({
               contents: `export function createDraftLanguagePicker() { return { choose: async (options) => { const index = await inu.ui.chooser({}); return index === null ? null : options[index].code; }, dispose() {} }; }`,
               loader: 'js',
@@ -187,9 +191,9 @@ function runtime(handler = async (texts) => texts.map((text) => text.replace('He
       draft.entities = entities;
     },
     choose: (index) => (chosen = index),
-    translate: () => actions.get('draft.translate').callback(ctx),
-    restore: () => actions.get('draft.restore').callback(ctx),
-    canRestore: () => actions.get('draft.restore').visible(ctx),
+    translate: () => native.draftMenu.translate(ctx),
+    restore: () => native.draftMenu.restore(ctx),
+    canRestore: () => native.draftMenu.canRestore(chat),
     close() {
       active = null;
       destroy({ thisObject: chat });
@@ -283,7 +287,7 @@ test('unloading cancels outstanding draft work', async () => {
   assert.equal(r.actions.size, 0);
 });
 
-test('the chat translation action is not hidden behind a UI-thread visibility request', () => {
+test('draft actions are available only through the send menu', () => {
   const r = runtime();
-  assert.equal(r.actions.get('draft.translate').visible, undefined);
+  assert.equal(r.actions.size, 0);
 });
