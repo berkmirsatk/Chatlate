@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.2.1
+
+### Providers
+
+- DeepL is removed; it was too limited to be useful.
+
 ## 1.2.0
 
 ### Translation

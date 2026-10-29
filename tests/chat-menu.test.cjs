@@ -149,7 +149,6 @@ test('the translate bar menu offers every service under Translate to and marks t
       ['Google', true],
       ['Yandex', false],
       ['Microsoft', false],
-      ['DeepL', false],
     ],
   );
   click(item);

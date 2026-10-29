@@ -1,6 +1,6 @@
 {
   "name": "chatlate",
-  "version": "1.2.0",
+  "version": "1.2.1",
   "author": "@berkmirsatk",
   "description": "Chat translation for Inugram with formatting preserved.",
   "scripts": {

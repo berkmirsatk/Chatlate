@@ -4,7 +4,7 @@ This document describes Chatlate's intended scope. Automated tests use simulated
 
 ## Translation and settings
 
-Inugram supplies the text selected for translation. Unprotected fragments and the target language go over HTTPS to Google, Yandex, Microsoft or DeepL. Enabled backups may receive the same fragments when earlier services fail. Text travels in request bodies, not URLs. Providers may retain requests under their own policies; plugin requests do not use Inugram's proxy.
+Inugram supplies the text selected for translation. Unprotected fragments and the target language go over HTTPS to Google, Yandex or Microsoft. Enabled backups may receive the same fragments when earlier services fail. Text travels in request bodies, not URLs. Providers may retain requests under their own policies; plugin requests do not use Inugram's proxy.
 
 There is no telemetry or persistent message archive. Translation caches are bounded and memory-only. Local preferences store language, provider order, cooldowns and a pending update version. Chatlate does not read clipboard contents or request arbitrary filesystem access.
 
@@ -13,7 +13,7 @@ There is no telemetry or persistent message archive. Translation caches are boun
 - Input, output, queues and caches are bounded. Body-size validation occurs after reading a response, not as a streaming limit.
 - Each provider serializes requests and isolates shared-subscriber cancellation. HTTP 429 cooldowns persist and are capped at 15 minutes.
 - Fallback visits eligible services once within a shared budget. A service gets 3.5 seconds, not counting its own request spacing, before the next one is tried; one that did not answer is tried last for a minute. A short note in the open chat (or a top notice elsewhere) names both services, at most once a minute per pair. Connection failures, rate limits (including Google's CAPTCHA redirect), temporary HTTP errors and malformed responses move to the next service; cancellation, invalid source formatting and permanent HTTP errors stop the chain.
-- Google, Microsoft and DeepL detect the language of each text in a request. For Yandex, which detects one language per request, fragments are grouped by the app-detected language or, when unknown, by writing system.
+- Google and Microsoft detect the language of each text in a request. For Yandex, which detects one language per request, fragments are grouped by the app-detected language or, when unknown, by writing system.
 - Stored priorities accept registered IDs only. Native provider changes are read back before saving; unload resets Chatlate's active selection to Telegram and leaves external providers alone.
 
 ## Native UI and community links
@@ -36,10 +36,9 @@ Before native import, Chatlate verifies the digest and asks Inugram's manifest p
 
 The digest checks integrity against GitHub metadata; it is not an independent publisher signature. Control of the repository or release account is a trust boundary. An accepted update runs with the permissions approved in Inugram. No access token is bundled in the installation file.
 
-DeepL uses `oneshot-free.www.deepl.com`, with no account or API key. Requests contain at most 1,500 UTF-16 units. Oversized fragments are preserved for an enabled backup; requests are never truncated.
 
 ## Grants and limits
 
-Fetch grants cover the four translation hosts plus the two GitHub hosts above. Other grants are `openUrl`, `clipboard.write`, `account.read(peers)`, `unsafe.jvm` and `unsafe.xposed`. Native and peer grants are broad host permissions: the source scopes its use, but those limits would not constrain a modified plugin.
+Fetch grants cover the three translation hosts plus the two GitHub hosts above. Other grants are `openUrl`, `clipboard.write`, `account.read(peers)`, `unsafe.jvm` and `unsafe.xposed`. Native and peer grants are broad host permissions: the source scopes its use, but those limits would not constrain a modified plugin.
 
 Unofficial translation endpoints and native host internals may change. Tests do not replace real-device checks of installation, cancellation, saved settings, native rendering and provider availability.
