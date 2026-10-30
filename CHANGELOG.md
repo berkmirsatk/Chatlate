@@ -4,8 +4,7 @@
 
 ### Translation
 
-- Articles get a translate bar like the one in chats, with the services and Hide in its menu; while it shows, the article menu leaves out its translation items.
-- Switch services from the article translator's menu; a translated article is translated again with the new one.
+- Articles get a translate bar like the one in chats. Its menu switches services, translating the article again, and hides it; Translate in the article menu brings it back.
 - Long articles translate faster and no longer leave parts untranslated.
 
 ### Providers

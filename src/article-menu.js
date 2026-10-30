@@ -18,23 +18,19 @@ export function articleState(helper, viewer) {
 }
 
 /**
- * Adds a service picker to the menu of Inugram's article (Instant View) translator.
+ * The services of the article translate bar, and the article menu's translation item.
  * Choosing another service translates an already translated page again with it.
- * Hook phases run on the UI thread; strings and provider changes happen on the plugin thread.
+ * Like in chats, the article menu leaves out its translation item while the bar shows.
+ * UI work runs on the UI thread; provider changes happen on the plugin thread.
  * @param {import('./provider.js').Provider[]} providers
  * @param {ReturnType<typeof import('./provider-selection.js').createProviderSelection>} selection
  */
 export function registerArticleMenu(providers, selection) {
-  let title = '';
   /** @type {{options: any, viewer: any} | undefined} */
   let menu;
-  function refresh() {
-    title = t('translationService');
-  }
-  refresh();
   /** @type {() => import('./provider.js').Provider | undefined} */
   let activeProvider = () => undefined;
-  /** @type {(container: any, anchor: any, viewer: any, shifted: boolean, extra?: (picker: any) => void) => void} */
+  /** @type {(container: any, anchor: any, viewer: any, extra?: (picker: any) => void) => void} */
   let openServices = () => {};
   /** @type {Set<() => void>} */
   const changeListeners = new Set();
@@ -65,8 +61,8 @@ export function registerArticleMenu(providers, selection) {
       }),
     );
 
-    // The services open as a menu of their own, in the article menu's colours. UI thread only.
-    openServices = (container, anchor, viewer, shifted, extra) => {
+    // The services open as a menu of their own, in the article menu's colours.
+    openServices = (container, anchor, viewer, extra) => {
       const active = activeProvider();
       if (!active) return;
       const picker = itemOptions.callStatic(
@@ -75,7 +71,7 @@ export function registerArticleMenu(providers, selection) {
         anchor,
       );
       try {
-        style(picker, viewer.getField('actionBar'), shifted);
+        style(picker, viewer.getField('actionBar'));
       } catch {
         /* the services still open in the default colours */
       }
@@ -91,29 +87,13 @@ export function registerArticleMenu(providers, selection) {
       menu = { options: picker, viewer };
     };
 
-    // The article menu has no swipeback page, so the services open as a second menu in its place.
-    const open = inu.jvm.runnable(() => {
-      const current = menu;
-      if (!current) return;
-      try {
-        const container = current.options.getField('container');
-        const button = current.options.getField('scrimView');
-        current.options.call('dismiss');
-        openServices(container, button, current.viewer, true);
-      } catch {
-        /* the article already closed */
-      }
-    });
-
-    /** Matches the article menu's colours, and its place under the menu button when shifted.
-     * @param {any} picker @param {any} bar @param {boolean} shifted */
-    function style(picker, bar, shifted) {
+    /** Matches the article menu's colours. @param {any} picker @param {any} bar */
+    function style(picker, bar) {
       const R = ')Lorg/telegram/ui/Components/ItemOptions;';
       const background = bar.getField('menuBackgroundColor');
       const text = bar.getField('menuTextColor');
       picker.call('setDimAlpha(I' + R, 0);
       picker.call('setColors(II' + R, text, bar.getField('menuIconColor'));
-      if (shifted) picker.call('translate(FF' + R, 0, -utilities.callStatic('dp(F)I', 52));
       picker.call('setMinWidth(I' + R, 200);
       picker.call(
         'setSelectorColor(I' + R,
@@ -155,30 +135,10 @@ export function registerArticleMenu(providers, selection) {
 
     const dispose = inu.xposed.hookMethod(helper.getDeclaredMethod('addMenuItem'), {
       before(ctx) {
-        // Like in chats, the article's translate bar replaces the menu's translation items.
         try {
           if (ctx.args[2] && barShown(ctx.args[2])) ctx.setReturnValue(null);
         } catch {
           /* the stock item stays */
-        }
-      },
-      after(ctx) {
-        try {
-          const [options, , viewer] = ctx.args;
-          if (ctx.throwable || !options || !viewer || barShown(viewer)) return;
-          const active = activeProvider();
-          if (!active) return;
-          const drawables = inu.jvm.cls('org.telegram.messenger.R$drawable');
-          options.call(
-            'add(ILjava/lang/CharSequence;Ljava/lang/CharSequence;Ljava/lang/Runnable;)Lorg/telegram/ui/Components/ItemOptions;',
-            drawables.getStaticField('msg_language'),
-            title,
-            active.name,
-            open,
-          );
-          menu = { options, viewer };
-        } catch {
-          /* the stock menu still opens */
         }
       },
     });
@@ -190,13 +150,12 @@ export function registerArticleMenu(providers, selection) {
     /* hosts without the article translator keep their own menu */
   }
   return {
-    refresh,
     /** The active Chatlate service, if Chatlate translates. */
     activeProvider: () => activeProvider(),
     /** Opens the services under a view of the article, with `extra` items below them. UI thread only.
      * @param {any} container @param {any} anchor @param {any} viewer @param {(picker: any) => void} [extra] */
     openServices: (container, anchor, viewer, extra) =>
-      openServices(container, anchor, viewer, false, extra),
+      openServices(container, anchor, viewer, extra),
     /** Runs on the UI thread after the service changes. @param {() => void} listener */
     onChange: (listener) => changeListeners.add(listener),
     /** Tells whether a viewer shows the translate bar. UI thread only. @param {(viewer: any) => boolean} check */

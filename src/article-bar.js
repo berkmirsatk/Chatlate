@@ -335,6 +335,19 @@ export function registerArticleBar(articleMenu) {
           }
         },
       }),
+      // Translate in the article menu brings a hidden bar back, as in chats.
+      inu.xposed.hookMethod(helper.getDeclaredMethod('onClick'), {
+        before(ctx) {
+          try {
+            const viewer = ctx.args[0];
+            const found = viewer && articleState(helper, viewer);
+            if (found) hidden.delete(String(found.page.getField('url')));
+          } catch {
+            /* the bar stays as it is */
+          }
+        },
+        after: () => update(),
+      }),
       // Translation starts, progresses, finishes and is undone through these.
       ...['invalidatePages', 'startProgress', 'finishProgress'].map((name) =>
         inu.xposed.hookMethod(helper.getDeclaredMethod(name), { after: () => update() }),

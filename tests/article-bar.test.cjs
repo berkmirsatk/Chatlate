@@ -70,8 +70,15 @@ function articleRuntime({ installed = 'installation:chatlate.google', sheet } = 
   };
   const state = {
     fields: { detectionDone: false, detectedSrcLang: null, unavailable: false, applied: false },
+    caches: { rich: ['rich'], string: ['string'] },
     getField(name) {
-      return name === 'original' ? page : this.fields[name];
+      if (name === 'original') return page;
+      if (name === 'richCache') return { call: () => this.caches.rich.splice(0) };
+      if (name === 'stringCache') return { call: () => this.caches.string.splice(0) };
+      return this.fields[name];
+    },
+    setField(name, value) {
+      this.fields[name] = value;
     },
   };
   const states = {
@@ -91,8 +98,12 @@ function articleRuntime({ installed = 'installation:chatlate.google', sheet } = 
   const menu = () => {
     const created = {
       items: [],
+      calls: [],
       call(signature, ...args) {
+        if (!signature.includes('(') && signature !== 'dismiss')
+          throw Error('ambiguous ' + signature);
         if (signature.startsWith('add')) this.items.push([signature.split('(')[0], ...args]);
+        else this.calls.push(signature.split('(')[0]);
       },
     };
     menus.push(created);
@@ -124,7 +135,12 @@ function articleRuntime({ installed = 'installation:chatlate.google', sheet } = 
         return Object.assign(View, {
           getStaticField(field) {
             if (field === 'TRANSLATION_PROVIDER')
-              return { call: (method) => (method === 'getValue' ? installed : undefined) };
+              return {
+                call(method, value) {
+                  if (method === 'getValue') return installed;
+                  if (method === 'setValue') installed = value;
+                },
+              };
             if (field === 'states') return states;
             return field;
           },
@@ -159,6 +175,9 @@ function articleRuntime({ installed = 'installation:chatlate.google', sheet } = 
     container,
     viewer,
     menus,
+    get installed() {
+      return installed;
+    },
     get bar() {
       return container.children.find((child) => child.kind === 'FrameLayout');
     },
@@ -273,4 +292,55 @@ test('the article menu leaves out its translation items while the bar is shown',
     setReturnValue: (value) => skipped.push(value),
   });
   assert.deepEqual(skipped, [null]);
+});
+
+test('choosing another service in the bar translates an already translated page again', async () => {
+  const runtime = articleRuntime();
+  harness({}, undefined, 'en', runtime.native);
+  runtime.open();
+  runtime.detect('en');
+  runtime.state.fields.applied = true;
+  runtime.button.listener.click(runtime.button);
+  const picker = runtime.menus.at(-1);
+  // Google is checked; Yandex is picked.
+  assert.deepEqual(
+    picker.items.slice(0, 3).map(([, checked]) => checked),
+    [true, false, false],
+  );
+  picker.items[1][3].run();
+  assert.ok(picker.calls.includes('dismiss'));
+  await new Promise((resolve) => setTimeout(resolve, 5));
+  assert.equal(runtime.installed, 'installation:chatlate.yandex');
+  assert.deepEqual(runtime.state.caches, { rich: [], string: [] });
+  assert.equal(runtime.state.fields.applied, false);
+  assert.deepEqual(runtime.clicks, [runtime.viewer]);
+});
+
+test('an untranslated page only saves the chosen service', async () => {
+  const runtime = articleRuntime();
+  harness({}, undefined, 'en', runtime.native);
+  runtime.open();
+  runtime.detect('en');
+  runtime.button.listener.click(runtime.button);
+  runtime.menus.at(-1).items[2][3].run();
+  await new Promise((resolve) => setTimeout(resolve, 5));
+  assert.equal(runtime.installed, 'installation:chatlate.microsoft');
+  assert.deepEqual(runtime.clicks, []);
+  assert.deepEqual(runtime.state.caches, { rich: ['rich'], string: ['string'] });
+});
+
+test('Translate in the article menu brings a hidden bar back', () => {
+  const runtime = articleRuntime();
+  harness({}, undefined, 'en', runtime.native);
+  runtime.open();
+  runtime.detect('en');
+  runtime.button.listener.click(runtime.button);
+  runtime.menus.at(-1).items.at(-1)[2].run();
+  assert.equal(runtime.bar.visibility, 8);
+  const onClick = runtime.hooks.get('InstantViewHelper.onClick');
+  onClick.before({ args: [runtime.viewer] });
+  runtime.state.fields.applied = true;
+  onClick.after({ args: [runtime.viewer] });
+  assert.equal(runtime.bar.visibility, 0);
+  assert.equal(runtime.label.text, 'Show Original');
 });

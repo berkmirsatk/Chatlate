@@ -40,7 +40,6 @@ for (const provider of providers) {
     translate: (request) => {
       // Keeps the chat menu's label in the app's current language.
       chatMenu.refresh();
-      articleMenu.refresh();
       return translator.translate(request);
     },
   });
@@ -50,6 +49,5 @@ const refreshDescription = registerDescription();
 registerSettings(providers, selection, () => {
   refreshDescription();
   chatMenu.refresh();
-  articleMenu.refresh();
   draftTranslation.refresh();
 });
