@@ -30,7 +30,7 @@ export function registerArticleBar(articleMenu) {
     const frame = (/** @type {number[]} */ ...args) =>
       layoutHelper.callStatic(
         args.length === 3
-          ? 'createFrame(IFI)Landroid/widget/FrameLayout$LayoutParams;'
+          ? 'createFrame(FFI)Landroid/widget/FrameLayout$LayoutParams;'
           : 'createFrame(IFIFFFF)Landroid/widget/FrameLayout$LayoutParams;',
         ...args,
       );
