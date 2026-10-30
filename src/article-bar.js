@@ -70,7 +70,12 @@ export function registerArticleBar(articleMenu) {
       if (!current) return;
       try {
         const found = articleState(helper, current.viewer);
-        if (found) hidden.add(String(found.page.getField('url')));
+        if (found) {
+          // As in chats, hiding the bar also turns the translation off.
+          if (found.state.getField('applied') && !found.state.getField('loading'))
+            helper.callStatic('onClick', current.viewer);
+          hidden.add(String(found.page.getField('url')));
+        }
       } catch {
         /* the article already closed */
       }

@@ -344,3 +344,15 @@ test('Translate in the article menu brings a hidden bar back', () => {
   assert.equal(runtime.bar.visibility, 0);
   assert.equal(runtime.label.text, 'Show Original');
 });
+
+test('hiding the bar of a translated article shows the original, as in chats', () => {
+  const runtime = articleRuntime();
+  harness({}, undefined, 'en', runtime.native);
+  runtime.open();
+  runtime.detect('en');
+  runtime.state.fields.applied = true;
+  runtime.button.listener.click(runtime.button);
+  runtime.menus.at(-1).items.at(-1)[2].run();
+  assert.deepEqual(runtime.clicks, [runtime.viewer]);
+  assert.equal(runtime.bar.visibility, 8);
+});
