@@ -1,6 +1,11 @@
 # Changelog
 
-## 1.2.1
+## 1.3.0
+
+### Translation
+
+- Switch services from the article translator's menu; a translated article is translated again with the new one.
+- Long articles translate faster and no longer leave parts untranslated.
 
 ### Providers
 

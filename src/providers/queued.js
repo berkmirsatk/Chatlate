@@ -41,7 +41,8 @@ function writingSystem(text) {
  * `batchSize` measures a fragment against `batchLimit` when a service bounds its request size.
  * Services that detect one language per request keep each batch to one language or script;
  * `detectsEachText` lifts that for services that detect every text separately.
- * @param {{id: string, name: string, fetchParts: (texts: string[], to: string, signal: AbortSignal) => Promise<string[]>, batchSize?: (text: string) => number, batchLimit?: number, detectsEachText?: boolean}} config
+ * `busyInterval` spaces requests while more text is waiting, such as a long article.
+ * @param {{id: string, name: string, fetchParts: (texts: string[], to: string, signal: AbortSignal) => Promise<string[]>, batchSize?: (text: string) => number, batchLimit?: number, detectsEachText?: boolean, busyInterval?: number}} config
  * @returns {import('../provider.js').Provider}
  */
 export function createQueuedProvider({
@@ -51,6 +52,7 @@ export function createQueuedProvider({
   batchSize = (text) => text.length,
   batchLimit = BATCH_MAX_CHARS,
   detectsEachText = false,
+  busyInterval = MIN_REQUEST_INTERVAL_MS,
 }) {
   // One shared queue across all chats and the connection-test button.
   const cache = createCache((value) => value.length);
@@ -109,7 +111,9 @@ export function createQueuedProvider({
             if (entries.every((e) => !e.waiters.size)) controller.abort();
           };
         try {
-          nextStart = Date.now() + MIN_REQUEST_INTERVAL_MS;
+          // Entries leave the queue once answered, so a larger queue means more is waiting.
+          nextStart =
+            Date.now() + (pending.size > entries.length ? busyInterval : MIN_REQUEST_INTERVAL_MS);
           const results = validate(
             await fetchParts(
               entries.map((entry) => entry.text),

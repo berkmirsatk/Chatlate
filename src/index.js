@@ -15,6 +15,7 @@ import { registerDescription } from './description.js';
 import { registerSettings } from './settings.js';
 import { createProviderSelection } from './provider-selection.js';
 import { registerChatMenu } from './chat-menu.js';
+import { registerArticleMenu } from './article-menu.js';
 import { registerProfileTranslation } from './profile-translation.js';
 import { registerDraftTranslation } from './draft-translation.js';
 import { registerKeepOriginal } from './keep-original.js';
@@ -23,6 +24,7 @@ import { registerRestrictedLanguages } from './restricted-languages.js';
 const providers = [createGoogleProvider(), createYandexProvider(), createMicrosoftProvider()];
 const selection = createProviderSelection(providers);
 const chatMenu = registerChatMenu(providers, selection);
+const articleMenu = registerArticleMenu(providers, selection);
 registerProfileTranslation(providers, selection);
 const draftTranslation = registerDraftTranslation(providers, selection);
 registerKeepOriginal();
@@ -36,6 +38,7 @@ for (const provider of providers) {
     translate: (request) => {
       // Keeps the chat menu's label in the app's current language.
       chatMenu.refresh();
+      articleMenu.refresh();
       return translator.translate(request);
     },
   });
@@ -45,5 +48,6 @@ const refreshDescription = registerDescription();
 registerSettings(providers, selection, () => {
   refreshDescription();
   chatMenu.refresh();
+  articleMenu.refresh();
   draftTranslation.refresh();
 });
