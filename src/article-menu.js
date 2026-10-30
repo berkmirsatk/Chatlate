@@ -95,8 +95,9 @@ export function registerArticleMenu(providers, selection) {
           if (!active) return;
           const drawables = inu.jvm.cls('org.telegram.messenger.R$drawable');
           const picker = options.call('makeSwipeback');
+          // ItemOptions overloads `add` by argument types, so name the one meant.
           picker.call(
-            'add',
+            'add(ILjava/lang/CharSequence;Ljava/lang/Runnable;)Lorg/telegram/ui/Components/ItemOptions;',
             drawables.getStaticField('ic_ab_back'),
             inu.jvm
               .cls('org.telegram.messenger.LocaleController')
@@ -107,8 +108,19 @@ export function registerArticleMenu(providers, selection) {
             back,
           );
           for (const [index, provider] of providers.entries())
-            picker.call('addChecked', provider === active, provider.name, picks[index]);
-          options.call('add', drawables.getStaticField('msg_language'), title, active.name, open);
+            picker.call(
+              'addChecked(ZLjava/lang/CharSequence;Ljava/lang/Runnable;)Lorg/telegram/ui/Components/ItemOptions;',
+              provider === active,
+              provider.name,
+              picks[index],
+            );
+          options.call(
+            'add(ILjava/lang/CharSequence;Ljava/lang/CharSequence;Ljava/lang/Runnable;)Lorg/telegram/ui/Components/ItemOptions;',
+            drawables.getStaticField('msg_language'),
+            title,
+            active.name,
+            open,
+          );
           menu = { options, picker, viewer };
         } catch {
           /* the stock menu still opens */

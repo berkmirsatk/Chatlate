@@ -48,7 +48,7 @@ test('Google 429 respects Retry-After, stops requests across chats, and persists
   await assert.rejects(run(reloaded, [{ text: 'Reloaded' }]), /limiting requests/);
 });
 
-test('Google serializes queued batches and spaces them by a second while text waits', async () => {
+test('Google spaces queued batches by a second while text waits', async () => {
   const starts = [];
   let active = 0,
     maxActive = 0;
@@ -75,6 +75,32 @@ test('Google serializes queued batches and spaces them by a second while text wa
   assert.equal(maxActive, 1);
   assert.ok(starts[1] - starts[0] >= 950);
   assert.ok(starts[1] - starts[0] < 1750);
+});
+
+test('a whole article sent at once is translated by Google in time, with requests overlapping', async () => {
+  const hosts = new Set();
+  let active = 0,
+    maxActive = 0;
+  const h = harness({}, async (url, options) => {
+    hosts.add(new URL(url).host);
+    active++;
+    maxActive = Math.max(maxActive, active);
+    await new Promise((r) => setTimeout(r, 1500));
+    active--;
+    return googleReply(new URLSearchParams(options.body).getAll('q').map((q) => 'tr ' + q));
+  });
+  // Inugram sends an article as many 20-text requests at the same moment.
+  const chunks = Array.from({ length: 11 }, (_, chunk) =>
+    run(
+      h,
+      Array.from({ length: 20 }, (_, i) => ({ text: `Paragraph ${chunk}.${i}` })),
+    ),
+  );
+  const results = await Promise.all(chunks);
+  assert.equal(results.flat().length, 220);
+  assert.equal(results[10][19].text, 'tr Paragraph 10.19');
+  assert.deepEqual([...hosts], ['translate.googleapis.com']);
+  assert.ok(maxActive > 1);
 });
 
 test('Google keeps its full spacing between separate messages', async () => {

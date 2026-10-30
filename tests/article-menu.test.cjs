@@ -49,7 +49,11 @@ function articleRuntime({ applied = true, installed = 'installation:chatlate.goo
     label,
     items: [],
     calls: [],
-    call(method, ...args) {
+    call(signature, ...args) {
+      const method = signature.split('(')[0];
+      // Overloaded methods must be named by their full signature.
+      if ((method === 'add' || method === 'addChecked') && !signature.includes('('))
+        throw Error('ambiguous ' + method);
       if (method === 'makeSwipeback') return (this.picker = menu('picker'));
       if (method === 'add' || method === 'addChecked') this.items.push([method, ...args]);
       else this.calls.push([method, ...args]);
