@@ -144,11 +144,11 @@ export function registerArticleBar(articleMenu) {
         frame(-1, 0.5, 87),
       );
       view.call('setVisibility', 8);
-      // Below the header in drawing order, so the header covers it while they move.
+      // Above the header: its view keeps its full height while it shrinks, and would take the bar's taps.
       container.call(
         'addView(Landroid/view/View;ILandroid/view/ViewGroup$LayoutParams;)V',
         view,
-        container.call('indexOfChild', viewer.getField('actionBar')),
+        container.call('indexOfChild', viewer.getField('actionBar')) + 1,
         frame(-1, BAR_HEIGHT_DP, 48),
       );
       bar = {
@@ -346,6 +346,7 @@ export function registerArticleBar(articleMenu) {
       ),
     ];
     articleMenu.onChange(update);
+    articleMenu.setBarCheck((viewer) => !!bar?.shown && bar.viewer.call('equals', viewer));
     inu.onUnload(() => {
       if (bar) detach(bar);
       for (const dispose of disposers) dispose();

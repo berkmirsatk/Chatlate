@@ -189,7 +189,7 @@ test('the article bar appears once a foreign page language is detected', () => {
   assert.equal(runtime.bar.visibility, 0);
   assert.equal(runtime.label.text, 'Translate to Turkish');
   // It sits under the header, and the article moves down to make room for it.
-  assert.equal(runtime.container.children.indexOf(runtime.bar), 0);
+  assert.equal(runtime.container.children.indexOf(runtime.bar), 1);
   assert.equal(runtime.bar.y, 80);
   assert.deepEqual(runtime.list.padding, [0, 96, 0, 0]);
 });
@@ -252,4 +252,25 @@ test('a half-open article sheet keeps the bar out of sight until it reaches the 
   sheet.attached = true;
   runtime.hooks.get('ArticleViewer$Sheet.checkNavColor').after({});
   assert.equal(runtime.bar.visibility, 0);
+});
+
+test('the article menu leaves out its translation items while the bar is shown', () => {
+  const runtime = articleRuntime();
+  harness({}, undefined, 'en', runtime.native);
+  runtime.open();
+  runtime.detect('en');
+  const menuItem = runtime.hooks.get('InstantViewHelper.addMenuItem');
+  const skipped = [];
+  menuItem.before({
+    args: [{}, {}, runtime.viewer],
+    setReturnValue: (value) => skipped.push(value),
+  });
+  assert.deepEqual(skipped, [null]);
+  runtime.button.listener.click(runtime.button);
+  runtime.menus.at(-1).items.at(-1)[2].run();
+  menuItem.before({
+    args: [{}, {}, runtime.viewer],
+    setReturnValue: (value) => skipped.push(value),
+  });
+  assert.deepEqual(skipped, [null]);
 });

@@ -38,6 +38,8 @@ export function registerArticleMenu(providers, selection) {
   let openServices = () => {};
   /** @type {Set<() => void>} */
   const changeListeners = new Set();
+  /** @type {(viewer: any) => boolean} */
+  let barShown = () => false;
   try {
     const helper = inu.jvm.cls('desu.inugram.helpers.translate.InstantViewHelper');
     const config = inu.jvm.cls('desu.inugram.InuConfig');
@@ -152,10 +154,18 @@ export function registerArticleMenu(providers, selection) {
     }
 
     const dispose = inu.xposed.hookMethod(helper.getDeclaredMethod('addMenuItem'), {
+      before(ctx) {
+        // Like in chats, the article's translate bar replaces the menu's translation items.
+        try {
+          if (ctx.args[2] && barShown(ctx.args[2])) ctx.setReturnValue(null);
+        } catch {
+          /* the stock item stays */
+        }
+      },
       after(ctx) {
         try {
           const [options, , viewer] = ctx.args;
-          if (ctx.throwable || !options || !viewer) return;
+          if (ctx.throwable || !options || !viewer || barShown(viewer)) return;
           const active = activeProvider();
           if (!active) return;
           const drawables = inu.jvm.cls('org.telegram.messenger.R$drawable');
@@ -189,5 +199,9 @@ export function registerArticleMenu(providers, selection) {
       openServices(container, anchor, viewer, false, extra),
     /** Runs on the UI thread after the service changes. @param {() => void} listener */
     onChange: (listener) => changeListeners.add(listener),
+    /** Tells whether a viewer shows the translate bar. UI thread only. @param {(viewer: any) => boolean} check */
+    setBarCheck: (check) => {
+      barShown = check;
+    },
   };
 }
