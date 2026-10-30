@@ -16,6 +16,7 @@ import { registerSettings } from './settings.js';
 import { createProviderSelection } from './provider-selection.js';
 import { registerChatMenu } from './chat-menu.js';
 import { registerArticleMenu } from './article-menu.js';
+import { registerArticleBar } from './article-bar.js';
 import { registerProfileTranslation } from './profile-translation.js';
 import { registerDraftTranslation } from './draft-translation.js';
 import { registerKeepOriginal } from './keep-original.js';
@@ -25,6 +26,7 @@ const providers = [createGoogleProvider(), createYandexProvider(), createMicroso
 const selection = createProviderSelection(providers);
 const chatMenu = registerChatMenu(providers, selection);
 const articleMenu = registerArticleMenu(providers, selection);
+registerArticleBar(articleMenu);
 registerProfileTranslation(providers, selection);
 const draftTranslation = registerDraftTranslation(providers, selection);
 registerKeepOriginal();

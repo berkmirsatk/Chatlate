@@ -14,6 +14,7 @@ function articleRuntime({ applied = true, installed = 'installation:chatlate.goo
   };
   const page = { call: (method, other) => method === 'equals' && other === page };
   const viewer = {
+    getField: (name) => (name === 'actionBar' ? header : undefined),
     call: (method) =>
       method === 'getCurrentPageLayout'
         ? { getField: () => ({ getField: () => page }) }
@@ -45,11 +46,10 @@ function articleRuntime({ applied = true, installed = 'installation:chatlate.goo
           }
         : undefined,
   };
-  const bar = {
+  const header = {
     getField: (name) => ({ menuBackgroundColor: 0, menuTextColor: -1, menuIconColor: -1 })[name],
   };
-  const row = { call: (method) => (method === 'getParent' ? bar : undefined) };
-  const button = { call: (method) => (method === 'getParent' ? row : undefined) };
+  const button = {};
   const menus = [];
   const menu = (label) => {
     const created = {
@@ -131,7 +131,7 @@ test('the article menu opens every service in a second menu and marks the active
   runtime.options.items[0][4]();
   assert.deepEqual(runtime.options.calls, [['dismiss']]);
   assert.equal(runtime.picker.calls.at(-1)[0], 'show');
-  // It takes the article menu's colours from the action bar.
+  // It takes the article menu's colours from the header.
   assert.ok(
     runtime.picker.calls.some(([method, ...args]) => method === 'setColors' && args[0] === -1),
   );

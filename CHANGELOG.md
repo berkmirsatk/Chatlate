@@ -4,6 +4,7 @@
 
 ### Translation
 
+- Articles get a translate bar like the one in chats, with the services and Hide in its menu.
 - Switch services from the article translator's menu; a translated article is translated again with the new one.
 - Long articles translate faster and no longer leave parts untranslated.
 
