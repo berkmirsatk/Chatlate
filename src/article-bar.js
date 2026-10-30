@@ -35,7 +35,7 @@ export function registerArticleBar(articleMenu) {
         ...args,
       );
 
-    /** @type {{viewer: any, view: any, label: any, button: any, divider: any, shown: boolean, y: number, padded: any[], height: number} | undefined} */
+    /** @type {{viewer: any, view: any, label: any, button: any, divider: any, shown: boolean, attached?: boolean, y: number, padded: any[], height: number} | undefined} */
     let bar;
     /** Articles whose bar was hidden, until the plugin reloads. */
     const hidden = new Set();
@@ -265,12 +265,21 @@ export function registerArticleBar(articleMenu) {
     function show(current, visible) {
       if (current.shown === visible) return;
       current.shown = visible;
+      current.attached = undefined;
       current.view.call('setVisibility', visible ? 0 : 8);
       if (visible) {
         // The header shrinks while the article scrolls; the bar stays right under it.
-        unfollow = inu.xposed.hookMethod(viewerClass.getDeclaredMethod('setCurrentHeaderHeight'), {
-          after: () => follow(),
-        });
+        const hooks = [
+          inu.xposed.hookMethod(viewerClass.getDeclaredMethod('setCurrentHeaderHeight'), {
+            after: () => follow(),
+          }),
+          // The article sheet reports here when it attaches to or leaves the header.
+          inu.xposed.hookMethod(
+            inu.jvm.cls('org.telegram.ui.ArticleViewer$Sheet').getDeclaredMethod('checkNavColor'),
+            { after: () => follow() },
+          ),
+        ];
+        unfollow = () => hooks.forEach((dispose) => dispose());
         return;
       }
       unfollow?.();
@@ -288,6 +297,13 @@ export function registerArticleBar(articleMenu) {
       const current = bar;
       if (!current?.shown) return;
       try {
+        const sheet = current.viewer.getField('sheet');
+        // A half-open article sheet has no header yet, so the bar waits until it attaches.
+        const attached = !sheet || sheet.getField('attachedToActionBar');
+        if (attached !== current.attached) {
+          current.attached = attached;
+          current.view.call('setVisibility', attached ? 0 : 4);
+        }
         const header = current.viewer.getField('actionBar');
         const y =
           header.call('getTop') +

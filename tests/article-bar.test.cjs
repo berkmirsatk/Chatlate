@@ -40,7 +40,7 @@ function fakeView(kind) {
   };
 }
 
-function articleRuntime({ installed = 'installation:chatlate.google' } = {}) {
+function articleRuntime({ installed = 'installation:chatlate.google', sheet } = {}) {
   const hooks = new Map(),
     disposed = new Set(),
     clicks = [],
@@ -64,7 +64,7 @@ function articleRuntime({ installed = 'installation:chatlate.google' } = {}) {
   };
   const viewer = {
     getField: (name) =>
-      ({ containerView: container, actionBar: header, currentHeaderHeight: 56 })[name],
+      ({ containerView: container, actionBar: header, currentHeaderHeight: 56, sheet })[name],
     call: (method, other) =>
       method === 'getCurrentPageLayout' ? layout : method === 'equals' && other === viewer,
   };
@@ -240,4 +240,16 @@ test('no article bar for the target language or another translation service', ()
     assert.equal(runtime.bar.visibility, 8);
     assert.deepEqual(runtime.list.padding, [0, 56, 0, 0]);
   }
+});
+
+test('a half-open article sheet keeps the bar out of sight until it reaches the header', () => {
+  const sheet = { attached: false, getField: () => sheet.attached };
+  const runtime = articleRuntime({ sheet });
+  harness({}, undefined, 'en', runtime.native);
+  runtime.open();
+  runtime.detect('en');
+  assert.equal(runtime.bar.visibility, 4);
+  sheet.attached = true;
+  runtime.hooks.get('ArticleViewer$Sheet.checkNavColor').after({});
+  assert.equal(runtime.bar.visibility, 0);
 });
