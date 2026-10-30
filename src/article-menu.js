@@ -49,7 +49,12 @@ export function registerArticleMenu(providers, selection) {
           container,
           button,
         );
-        style(picker, button.call('getParent'));
+        try {
+          // The menu button sits in the action bar's right-hand row.
+          style(picker, button.call('getParent').call('getParent'));
+        } catch {
+          /* the services still open in the default colours */
+        }
         for (const [index, provider] of providers.entries())
           picker.call(
             'addChecked(ZLjava/lang/CharSequence;Ljava/lang/Runnable;)Lorg/telegram/ui/Components/ItemOptions;',
