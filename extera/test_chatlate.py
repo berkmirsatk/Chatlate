@@ -7,6 +7,23 @@ import os
 import unittest
 from urllib.parse import parse_qs
 
+import sys
+import types
+
+# exteraGram's modules exist only in the app; the core under test needs none of them.
+for name, attributes in {
+    "requests": {},
+    "base_plugin": {"BasePlugin": object, "MethodHook": object},
+    "client_utils": {"run_on_queue": None},
+    "hook_utils": {"find_class": None},
+    "java": {"jclass": None},
+    "ui": {},
+    "ui.settings": dict.fromkeys(["Divider", "Header", "Selector", "Switch", "Text"]),
+}.items():
+    module = types.ModuleType(name)
+    module.__dict__.update(attributes)
+    sys.modules.setdefault(name, module)
+
 PATH = os.path.join(os.path.dirname(__file__), "chatlate.plugin")
 loader = importlib.machinery.SourceFileLoader("chatlate_plugin", PATH)
 spec = importlib.util.spec_from_loader("chatlate_plugin", loader)

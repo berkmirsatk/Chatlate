@@ -19,21 +19,33 @@ import threading
 import time
 from urllib.parse import quote
 
-try:
-    import requests
-except ImportError:  # outside exteraGram, tests supply their own transport
-    requests = None
+import requests
+from base_plugin import BasePlugin, MethodHook
+from client_utils import run_on_queue
+from hook_utils import find_class
+from java import jclass
+from ui.settings import Divider, Header, Selector, Switch, Text
 
-try:
-    from base_plugin import BasePlugin, MethodHook
-    from hook_utils import find_class, get_private_field, set_private_field
-    from client_utils import run_on_queue
-    from ui.settings import Header, Selector, Switch, Text, Divider
-    from ui.bulletin import BulletinHelper
-    from java import jclass
-except ImportError:  # unit tests run the pure core without the app
-    BasePlugin = object
-    MethodHook = object
+
+def private_field(obj, name):
+    """A field declared on the object's class or one of its superclasses."""
+    cls = obj.getClass()
+    while cls is not None:
+        try:
+            field = cls.getDeclaredField(name)
+            field.setAccessible(True)
+            return field
+        except Exception:
+            cls = cls.getSuperclass()
+    raise AttributeError(name)
+
+
+def get_field(obj, name):
+    return private_field(obj, name).get(obj)
+
+
+def set_field(obj, name, value):
+    private_field(obj, name).set(obj, value)
 
 
 # ---------------------------------------------------------------------------
@@ -597,8 +609,8 @@ class AlertHook(MethodHook):
     def before_hooked_method(self, param):
         try:
             alert = param.thisObject
-            if get_private_field(alert, "reqRichMessage") is None and not get_private_field(alert, "reqSum"):
-                set_private_field(alert, "reqPeer", None)
+            if get_field(alert, "reqRichMessage") is None and not get_field(alert, "reqSum"):
+                set_field(alert, "reqPeer", None)
         except Exception:
             pass
 
@@ -611,16 +623,33 @@ class ChatlatePlugin(BasePlugin):
         self.testing = False
         self.translator = Translator([Google(), Yandex(), Microsoft()], self.order)
         self.TranslateText = jclass("org.telegram.tgnet.TLRPC$TL_messages_translateText")
-        manager = find_class("org.telegram.tgnet.ConnectionsManager")
-        self.hook_all_methods(manager, "sendRequestInternal", TranslateRequestHook(self))
-        controller = find_class("org.telegram.messenger.TranslateController")
-        self.hook_all_methods(controller, "pushToTranslate", SourceHook(self))
-        alert = find_class("org.telegram.ui.Components.TranslateAlert2")
-        self.hook_all_methods(alert, "translate", AlertHook())
+        # Each hook is optional: a missing one leaves that path to Telegram.
+        for class_name, method, hook in (
+            ("org.telegram.tgnet.ConnectionsManager", "sendRequestInternal", TranslateRequestHook(self)),
+            ("org.telegram.messenger.TranslateController", "pushToTranslate", SourceHook(self)),
+            ("org.telegram.ui.Components.TranslateAlert2", "translate", AlertHook()),
+        ):
+            try:
+                self.hook_named(find_class(class_name), method, hook)
+            except Exception as error:
+                self.log("could not hook %s.%s: %s" % (class_name, method, error))
+
+    def hook_named(self, cls, name, hook):
+        """Every declared method with this name; older SDKs have no hook_all_methods."""
+        if hasattr(self, "hook_all_methods"):
+            self.hook_all_methods(cls, name, hook)
+            return
+        for method in cls.getDeclaredMethods():
+            if method.getName() == name:
+                self.hook_method(method, hook)
 
     def log(self, message):
         try:
-            self.logger.info(message)
+            logger = getattr(self, "logger", None)
+            if logger is not None:
+                logger.info(message)
+            else:
+                super().log(message)
         except Exception:
             pass
 
@@ -671,7 +700,7 @@ class ChatlatePlugin(BasePlugin):
         request = param.args[0]
         if not isinstance(request, self.TranslateText):
             return
-        account = int(get_private_field(param.thisObject, "currentAccount") or 0)
+        account = int(get_field(param.thisObject, "currentAccount") or 0)
         texts = self.request_texts(account, request)
         if texts is None:
             return  # unknown messages keep Telegram's own translation
@@ -751,10 +780,10 @@ class ChatlatePlugin(BasePlugin):
                 rows.append(Switch(
                     key="backup_" + pid, text=t("backup", name=PROVIDER_NAMES[index]), default=False,
                 ))
-        rows.append(Text(text=t("testing") if self.testing else t("test"), accent=True,
+        rows.append(Text(text=t("testing") if self.testing else t("test"),
                          on_click=lambda _view: self.test()))
         for line, successful in self.results:
-            rows.append(Text(text=line, red=not successful))
+            rows.append(Text(text=("✓ " if successful else "✕ ") + line))
         rows.append(Divider(text=t("backup_info") if len(self.order()) > 1 else t("privacy")))
         rows += [
             Header(text=t("community")),
