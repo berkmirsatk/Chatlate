@@ -1,0 +1,798 @@
+"""Chatlate for exteraGram: chat translation with formatting preserved.
+
+Copyright (c) 2026 berkmirsatk. SPDX-License-Identifier: GPL-3.0-only.
+Source and license: https://github.com/berkmirsatk/Chatlate
+"""
+
+__id__ = "chatlate"
+__name__ = "Chatlate"
+__description__ = "Chat translation with formatting preserved, through Google, Yandex or Microsoft."
+__author__ = "@berkmirsatk"
+__version__ = "1.0.0"
+__icon__ = "Plumgins/2"
+
+import html
+import json
+import random
+import re
+import threading
+import time
+from urllib.parse import quote
+
+try:
+    import requests
+except ImportError:  # outside exteraGram, tests supply their own transport
+    requests = None
+
+try:
+    from base_plugin import BasePlugin, MethodHook
+    from hook_utils import find_class, get_private_field, set_private_field
+    from client_utils import run_on_queue
+    from ui.settings import Header, Selector, Switch, Text, Divider
+    from ui.bulletin import BulletinHelper
+    from java import jclass
+except ImportError:  # unit tests run the pure core without the app
+    BasePlugin = object
+    MethodHook = object
+
+
+# ---------------------------------------------------------------------------
+# Strings
+
+STRINGS = {
+    "en": {
+        "services": "Translation services",
+        "primary": "Primary service",
+        "backup": "Use {name} as a backup",
+        "backup_info": "When the primary service fails, text may be sent to the enabled backups in this order.",
+        "test": "Test connection",
+        "testing": "Testing…",
+        "success": "Connection successful.",
+        "result": "{name}: {status} · {ms} ms",
+        "privacy": "Text is sent only to the selected translation service.",
+        "community": "Community",
+        "channel": "Channel",
+        "github": "GitHub",
+        "failed": "Could not connect to the translation service.",
+        "limited": "The translation service is limiting requests. Try again in {seconds} seconds.",
+        "http": "Translation service returned HTTP {status}.",
+        "invalid": "Invalid translation response.",
+        "too_large": "Too much text. Select fewer messages.",
+    },
+    "tr": {
+        "services": "Çeviri hizmetleri",
+        "primary": "Birincil hizmet",
+        "backup": "{name} yedek olarak kullanılsın",
+        "backup_info": "Birincil hizmet çalışmazsa metin, açık yedeklere bu sırayla gönderilebilir.",
+        "test": "Bağlantıyı test et",
+        "testing": "Test ediliyor…",
+        "success": "Bağlantı başarılı.",
+        "result": "{name}: {status} · {ms} ms",
+        "privacy": "Metin yalnızca seçilen çeviri hizmetine gönderilir.",
+        "community": "Topluluk",
+        "channel": "Kanal",
+        "github": "GitHub",
+        "failed": "Çeviri servisine bağlanılamadı.",
+        "limited": "Çeviri servisi istekleri sınırlıyor. {seconds} saniye sonra tekrar deneyin.",
+        "http": "Çeviri servisi HTTP {status} yanıtı verdi.",
+        "invalid": "Geçersiz çeviri yanıtı.",
+        "too_large": "Çok fazla metin var. Daha az mesaj seçin.",
+    },
+}
+
+
+def app_language():
+    try:
+        locale = jclass("org.telegram.messenger.LocaleController").getInstance()
+        code = str(locale.getCurrentLocaleInfo().pluralLangCode or "en")
+        return code.split("_")[0].split("-")[0].lower()
+    except Exception:
+        return "en"
+
+
+def t(key, **values):
+    table = STRINGS.get(app_language(), STRINGS["en"])
+    return table.get(key, STRINGS["en"][key]).format(**values)
+
+
+# ---------------------------------------------------------------------------
+# UTF-16 offsets: Telegram counts entity offsets in UTF-16 units, Python in code points.
+
+def utf16_length(text):
+    return sum(2 if ord(char) > 0xFFFF else 1 for char in text)
+
+
+def utf16_index(text):
+    """Maps each UTF-16 offset that falls on a character boundary to its Python index."""
+    mapping = {}
+    unit = 0
+    for index, char in enumerate(text):
+        mapping[unit] = index
+        unit += 2 if ord(char) > 0xFFFF else 1
+    mapping[unit] = len(text)
+    return mapping
+
+
+# ---------------------------------------------------------------------------
+# Formatting: split at entity boundaries and translate only unprotected text.
+
+PROTECTED = {
+    "MessageEntityCode", "MessageEntityPre", "MessageEntityUrl", "MessageEntityEmail",
+    "MessageEntityPhone", "MessageEntityMention", "MessageEntityMentionName",
+    "InputMessageEntityMentionName", "MessageEntityHashtag", "MessageEntityCashtag",
+    "MessageEntityBotCommand", "MessageEntityCustomEmoji", "MessageEntityUnknown",
+}
+LINE_BREAKS = re.compile(r"\r\n|\r|\n")
+LETTER = re.compile(r"[^\W\d_]")
+
+
+class FormattingError(Exception):
+    pass
+
+
+def entity_kind(name):
+    """'TL_messageEntityBold' or 'TLRPC$TL_messageEntityBold' -> 'MessageEntityBold'."""
+    name = name.rsplit("$", 1)[-1]
+    if name.startswith("TL_"):
+        name = name[3:]
+    return name[:1].upper() + name[1:]
+
+
+def plan(text, entities):
+    """entities: [(kind, offset16, length16)]. Returns pieces and entity ranges in Python indices."""
+    index = utf16_index(text)
+    total = utf16_length(text)
+    ranges = []
+    points = {0, len(text)}
+    for match in LINE_BREAKS.finditer(text):
+        points.update((match.start(), match.end()))
+    for kind, offset, length in entities:
+        if offset < 0 or length <= 0 or offset + length > total:
+            raise FormattingError("range")
+        if offset not in index or offset + length not in index:
+            raise FormattingError("emoji")
+        start, end = index[offset], index[offset + length]
+        ranges.append((kind, start, end))
+        points.update((start, end))
+    bounds = sorted(points)
+    pieces = []
+    for start, end in zip(bounds, bounds[1:]):
+        raw = text[start:end]
+        locked = any(
+            entity_kind(kind) in PROTECTED and s <= start and e >= end for kind, s, e in ranges
+        )
+        stripped = raw.lstrip()
+        leading = raw[: len(raw) - len(stripped)]
+        body = stripped.rstrip()
+        trailing = stripped[len(body):]
+        pieces.append({
+            "start": start, "end": end, "raw": raw, "leading": leading,
+            "trailing": trailing, "body": body,
+            "translate": not locked and bool(LETTER.search(body)),
+        })
+    return {"pieces": pieces, "ranges": ranges}
+
+
+def assemble(planned, translated):
+    """Returns the translated text and each entity's new (offset16, length16), in input order."""
+    mapped = {0: 0}
+    parts = []
+    length = 0
+    used = 0
+    for piece in planned["pieces"]:
+        mapped[piece["start"]] = length
+        if piece["translate"]:
+            part = piece["leading"] + translated[used] + piece["trailing"]
+            used += 1
+        else:
+            part = piece["raw"]
+        parts.append(part)
+        length += len(part)
+        mapped[piece["end"]] = length
+    if used != len(translated):
+        raise FormattingError("parts")
+    text = "".join(parts)
+    units = utf16_index(text)
+    to_unit = {index: unit for unit, index in units.items()}
+    entities = []
+    for _kind, start, end in planned["ranges"]:
+        new_start, new_end = to_unit[mapped[start]], to_unit[mapped[end]]
+        entities.append((new_start, new_end - new_start))
+    return text, entities
+
+
+def validate(results, count):
+    if (
+        not isinstance(results, list)
+        or len(results) != count
+        or any(not isinstance(r, str) or not r.strip() or "\n" in r or "\r" in r for r in results)
+        or sum(len(r) for r in results) > 100000
+    ):
+        raise InvalidResponse()
+    return results
+
+
+# ---------------------------------------------------------------------------
+# Providers
+
+class ProviderError(Exception):
+    """Another service may still succeed."""
+
+
+class InvalidResponse(ProviderError):
+    def __str__(self):
+        return t("invalid")
+
+
+class RateLimited(ProviderError):
+    def __init__(self, seconds):
+        super().__init__()
+        self.seconds = seconds
+
+    def __str__(self):
+        return t("limited", seconds=max(1, int(self.seconds)))
+
+
+class HttpError(ProviderError):
+    def __init__(self, status):
+        super().__init__()
+        self.status = status
+
+    def __str__(self):
+        return t("http", status=self.status)
+
+
+class ConnectionFailed(ProviderError):
+    def __str__(self):
+        return t("failed")
+
+
+def http_post(url, data=None, json_body=None, headers=None, timeout=8):
+    """Returns (status, parsed JSON or None). Redirects are never followed."""
+    try:
+        response = requests.post(
+            url, data=data, json=json_body, headers=headers or {}, timeout=(5, timeout),
+            allow_redirects=False,
+        )
+    except Exception:
+        raise ConnectionFailed()
+    try:
+        body = response.json()
+    except Exception:
+        body = None
+    return response.status_code, body, response.headers.get("retry-after", "")
+
+
+GOOGLE_AGENT = (
+    "Mozilla/5.0 (Linux; Android 13) AppleWebKit/537.36 (KHTML, like Gecko) "
+    "Chrome/120.0.0.0 Mobile Safari/537.36"
+)
+SCRIPTS = [
+    ("han", re.compile("[一-鿿㐀-䶿]")),
+    ("hangul", re.compile("[가-힯ᄀ-ᇿ]")),
+    ("cyrillic", re.compile("[Ѐ-ӿ]")),
+    ("arabic", re.compile("[؀-ۿ]")),
+    ("hebrew", re.compile("[֐-׿]")),
+    ("greek", re.compile("[Ͱ-Ͽ]")),
+    ("thai", re.compile("[฀-๿]")),
+    ("devanagari", re.compile("[ऀ-ॿ]")),
+    ("latin", re.compile("[A-Za-zÀ-ɏ]")),
+]
+KANA = re.compile("[぀-ヿ]")
+
+
+def writing_system(text):
+    """Yandex detects one language per request, so texts are grouped by script."""
+    if KANA.search(text):
+        return "kana"
+    best, count = "other", 0
+    for name, pattern in SCRIPTS:
+        found = len(pattern.findall(text))
+        if found > count:
+            best, count = name, found
+    return best
+
+
+class Provider:
+    id = ""
+    name = ""
+    batch_limit = 3500
+    groups_by_script = False
+
+    def __init__(self, post=http_post):
+        self.post = post
+
+    def size(self, text):
+        return len(text)
+
+    def batches(self, texts):
+        """Index lists, each within the service's request size."""
+        groups = {}
+        for index, text in enumerate(texts):
+            key = writing_system(text) if self.groups_by_script else ""
+            groups.setdefault(key, []).append(index)
+        for indexes in groups.values():
+            batch, size = [], 0
+            for index in indexes:
+                weight = self.size(texts[index]) + 40
+                if batch and (size + weight > self.batch_limit or len(batch) >= 40):
+                    yield batch
+                    batch, size = [], 0
+                batch.append(index)
+                size += weight
+            if batch:
+                yield batch
+
+    def translate(self, texts, to, timeout):
+        results = [None] * len(texts)
+        for batch in self.batches(texts):
+            translated = validate(self.fetch([texts[i] for i in batch], to, timeout), len(batch))
+            for index, text in zip(batch, translated):
+                results[index] = text
+        return results
+
+    def fetch(self, texts, to, timeout):
+        raise NotImplementedError
+
+    @staticmethod
+    def check(status, retry_after=""):
+        if status == 429 or 300 <= status < 400:
+            try:
+                seconds = float(retry_after)
+            except (TypeError, ValueError):
+                seconds = 0
+            raise RateLimited(seconds)
+        if status in (408, 405, 413, 400) or 500 <= status <= 599:
+            raise HttpError(status)
+        if status != 200:
+            raise PermanentHttpError(status)
+
+
+class PermanentHttpError(Exception):
+    def __init__(self, status):
+        super().__init__()
+        self.status = status
+
+    def __str__(self):
+        return t("http", status=self.status)
+
+
+def google_escape(text):
+    return text.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+
+
+class Google(Provider):
+    id = "google"
+    name = "Google"
+    batch_limit = 10000
+
+    def size(self, text):
+        return len(quote(google_escape(text), safe=""))
+
+    def fetch(self, texts, to, timeout):
+        status, data, retry = self.post(
+            "https://translate.googleapis.com/translate_a/t?client=gtx&sl=auto&tl=" + quote(to),
+            data="&".join("q=" + quote(google_escape(text), safe="") for text in texts),
+            headers={
+                "User-Agent": GOOGLE_AGENT,
+                "Accept-Language": "en-US,en;q=0.9",
+                "content-type": "application/x-www-form-urlencoded;charset=UTF-8",
+            },
+            timeout=timeout,
+        )
+        self.check(status, retry)
+        items = [data] if len(texts) == 1 and isinstance(data, list) and data and isinstance(data[0], str) else data
+        if not isinstance(items, list) or len(items) != len(texts):
+            raise InvalidResponse()
+        out = []
+        for item in items:
+            value = item if isinstance(item, str) else item[0] if isinstance(item, list) and item else None
+            if not isinstance(value, str):
+                raise InvalidResponse()
+            out.append(value)
+        return out
+
+
+def yandex_language(language):
+    code = language.lower()
+    if code == "zh" or code.startswith("zh-") or code.startswith("zh_"):
+        return "zh"
+    return {"iw": "he", "jw": "jv", "in": "id", "ji": "yi"}.get(code, language)
+
+
+class Yandex(Provider):
+    id = "yandex"
+    name = "Yandex"
+    groups_by_script = True
+
+    def fetch(self, texts, to, timeout):
+        session = "".join(random.choice("0123456789abcdef") for _ in range(32))
+        status, data, retry = self.post(
+            "https://translate.yandex.net/api/v1/tr.json/translate?id=" + session
+            + "-0-0&srv=android&lang=" + quote(yandex_language(to)),
+            data="&".join("text=" + quote(text, safe="") for text in texts),
+            headers={"content-type": "application/x-www-form-urlencoded"},
+            timeout=timeout,
+        )
+        self.check(status, retry)
+        if not isinstance(data, dict) or data.get("code") != 200:
+            if isinstance(data, dict) and isinstance(data.get("code"), int):
+                self.check(data["code"])
+            raise InvalidResponse()
+        return data.get("text")
+
+
+def microsoft_language(language):
+    code = language.lower().replace("_", "-")
+    if code in ("zh-tw", "zh-hk", "zh-mo", "zh-hant"):
+        return "zh-Hant"
+    if code == "zh" or code.startswith("zh-"):
+        return "zh-Hans"
+    if code == "pt-pt":
+        return "pt-pt"
+    if code == "sr":
+        return "sr-Cyrl"
+    if code == "mn":
+        return "mn-Cyrl"
+    base = code.split("-")[0]
+    return {"iw": "he", "in": "id", "no": "nb", "tl": "fil"}.get(base, base)
+
+
+MICROSOFT_ENTITIES = {"&amp;": "&", "&lt;": "<", "&gt;": ">", "&quot;": '"', "&#39;": "'"}
+
+
+class Microsoft(Provider):
+    id = "microsoft"
+    name = "Microsoft"
+    batch_limit = 10000
+
+    def fetch(self, texts, to, timeout):
+        status, data, retry = self.post(
+            "https://edge.microsoft.com/translate/translatetext?isEnterpriseClient=false&to="
+            + quote(microsoft_language(to)),
+            json_body=texts,
+            headers={"content-type": "application/json"},
+            timeout=timeout,
+        )
+        if status == 400:
+            raise HttpError(400)
+        self.check(status, retry)
+        if not isinstance(data, list) or len(data) != len(texts):
+            raise InvalidResponse()
+        out = []
+        for source, item in zip(texts, data):
+            try:
+                value = item["translations"][0]["text"]
+            except (KeyError, IndexError, TypeError):
+                raise InvalidResponse()
+            if not isinstance(value, str):
+                raise InvalidResponse()
+            # Decode what the service escaped, unless the source spelled it out.
+            for entity, char in MICROSOFT_ENTITIES.items():
+                if entity not in source:
+                    value = value.replace(entity, char)
+            out.append(value)
+        return out
+
+
+# ---------------------------------------------------------------------------
+# Translator: cache, cooldowns and failover in the user's order.
+
+ATTEMPT_SECONDS = 6
+BUDGET_SECONDS = 25
+MAX_COOLDOWN = 15 * 60
+CACHE_LIMIT = 2000
+
+
+class Translator:
+    def __init__(self, providers, order, clock=time.time):
+        self.providers = {provider.id: provider for provider in providers}
+        self.order = order  # callable -> list of provider ids, primary first
+        self.clock = clock
+        self.cache = {}
+        self.blocked = {}
+        self.strikes = {}
+        self.lock = threading.Lock()
+
+    def cached(self, provider_id, to, text):
+        return self.cache.get((provider_id, to, text))
+
+    def remember(self, provider_id, to, texts, results):
+        with self.lock:
+            for text, result in zip(texts, results):
+                self.cache[(provider_id, to, text)] = result
+            while len(self.cache) > CACHE_LIMIT:
+                self.cache.pop(next(iter(self.cache)))
+
+    def run(self, provider, texts, to, timeout):
+        """One service, cached fragments skipped. Raises ProviderError to fail over."""
+        now = self.clock()
+        until = self.blocked.get(provider.id, 0)
+        if until > now:
+            raise RateLimited(until - now)
+        missing = [text for text in dict.fromkeys(texts) if self.cached(provider.id, to, text) is None]
+        if missing:
+            try:
+                results = provider.translate(missing, to, timeout)
+            except RateLimited as error:
+                strikes = self.strikes.get(provider.id, 0) + 1
+                self.strikes[provider.id] = strikes
+                backoff = min(MAX_COOLDOWN, 60 * 2 ** min(strikes - 1, 4))
+                self.blocked[provider.id] = now + max(backoff, error.seconds)
+                raise RateLimited(self.blocked[provider.id] - now)
+            self.strikes[provider.id] = 0
+            self.remember(provider.id, to, missing, results)
+        return [self.cached(provider.id, to, text) for text in texts]
+
+    def translate_parts(self, texts, to):
+        """Tries each service in order; never mixes services within one request."""
+        order = [self.providers[i] for i in self.order() if i in self.providers]
+        deadline = self.clock() + BUDGET_SECONDS
+        error = None
+        for index, provider in enumerate(order):
+            remaining = deadline - self.clock()
+            if remaining <= 0:
+                break
+            timeout = remaining if index == len(order) - 1 else min(ATTEMPT_SECONDS, remaining)
+            try:
+                return self.run(provider, texts, to, timeout)
+            except ProviderError as failure:
+                error = failure
+        raise error or ConnectionFailed()
+
+    def translate(self, items, to):
+        """items: [(text, [(kind, offset16, length16)])] -> [(text, [(offset16, length16)])]."""
+        if len(items) > 100 or sum(len(text) for text, _ in items) > 18000:
+            raise PermanentHttpError(413)
+        plans = [plan(text, entities) for text, entities in items]
+        parts = [p["body"] for planned in plans for p in planned["pieces"] if p["translate"]]
+        translated = self.translate_parts(parts, to) if parts else []
+        out, used = [], 0
+        for planned in plans:
+            count = sum(1 for p in planned["pieces"] if p["translate"])
+            out.append(assemble(planned, translated[used:used + count]))
+            used += count
+        return out
+
+
+# ---------------------------------------------------------------------------
+# exteraGram glue
+
+PROVIDER_IDS = ["google", "yandex", "microsoft"]
+PROVIDER_NAMES = ["Google", "Yandex", "Microsoft"]
+CHANNEL_URL = "https://t.me/Plumgins"
+GITHUB_URL = "https://github.com/berkmirsatk/Chatlate"
+MAX_SOURCES = 2000
+
+
+class TranslateRequestHook(MethodHook):
+    """ConnectionsManager.sendRequestInternal: answers translation requests itself."""
+
+    def __init__(self, plugin):
+        self.plugin = plugin
+
+    def before_hooked_method(self, param):
+        try:
+            self.plugin.intercept(param)
+        except Exception as error:
+            self.plugin.log("intercept failed: %s" % error)
+
+
+class SourceHook(MethodHook):
+    """TranslateController.pushToTranslate: remembers message text for id-based requests."""
+
+    def __init__(self, plugin):
+        self.plugin = plugin
+
+    def before_hooked_method(self, param):
+        try:
+            self.plugin.remember_source(param.args[0])
+        except Exception:
+            pass
+
+
+class AlertHook(MethodHook):
+    """TranslateAlert2.translate: send the popup's own text instead of a message id."""
+
+    def before_hooked_method(self, param):
+        try:
+            alert = param.thisObject
+            if get_private_field(alert, "reqRichMessage") is None and not get_private_field(alert, "reqSum"):
+                set_private_field(alert, "reqPeer", None)
+        except Exception:
+            pass
+
+
+class ChatlatePlugin(BasePlugin):
+    def on_plugin_load(self):
+        self.sources = {}
+        self.sources_lock = threading.Lock()
+        self.results = []
+        self.testing = False
+        self.translator = Translator([Google(), Yandex(), Microsoft()], self.order)
+        self.TranslateText = jclass("org.telegram.tgnet.TLRPC$TL_messages_translateText")
+        manager = find_class("org.telegram.tgnet.ConnectionsManager")
+        self.hook_all_methods(manager, "sendRequestInternal", TranslateRequestHook(self))
+        controller = find_class("org.telegram.messenger.TranslateController")
+        self.hook_all_methods(controller, "pushToTranslate", SourceHook(self))
+        alert = find_class("org.telegram.ui.Components.TranslateAlert2")
+        self.hook_all_methods(alert, "translate", AlertHook())
+
+    def log(self, message):
+        try:
+            self.logger.info(message)
+        except Exception:
+            pass
+
+    # -- order ---------------------------------------------------------------
+
+    def order(self):
+        primary = PROVIDER_IDS[int(self.get_setting("primary", 0)) % len(PROVIDER_IDS)]
+        backups = [
+            pid for pid in PROVIDER_IDS
+            if pid != primary and self.get_setting("backup_" + pid, False)
+        ]
+        return [primary] + backups
+
+    # -- requests ------------------------------------------------------------
+
+    def remember_source(self, message):
+        owner = message.messageOwner
+        if owner is None or owner.message is None:
+            return
+        key = (int(message.currentAccount), int(message.getDialogId()), int(message.getId()))
+        with self.sources_lock:
+            self.sources[key] = (str(owner.message), owner.entities)
+            while len(self.sources) > MAX_SOURCES:
+                self.sources.pop(next(iter(self.sources)))
+
+    def request_texts(self, account, request):
+        """The request's texts, or the remembered texts of the messages it names."""
+        texts = request.text
+        if texts is not None and texts.size() > 0:
+            return [(str(item.text or ""), item.entities) for item in texts]
+        if request.peer is None or request.id is None:
+            return None
+        peer = request.peer
+        dialog = (
+            int(peer.user_id) if peer.user_id else
+            -int(peer.chat_id) if peer.chat_id else -int(peer.channel_id)
+        )
+        found = []
+        with self.sources_lock:
+            for message_id in request.id:
+                source = self.sources.get((account, dialog, int(message_id)))
+                if source is None:
+                    return None
+                found.append(source)
+        return found
+
+    def intercept(self, param):
+        request = param.args[0]
+        if not isinstance(request, self.TranslateText):
+            return
+        account = int(get_private_field(param.thisObject, "currentAccount") or 0)
+        texts = self.request_texts(account, request)
+        if texts is None:
+            return  # unknown messages keep Telegram's own translation
+        on_complete, on_timestamp = param.args[1], param.args[2]
+        language = str(request.to_lang or "en")
+        param.setResult(None)
+        run_on_queue(lambda: self.answer(texts, language, on_complete, on_timestamp))
+
+    def answer(self, texts, language, on_complete, on_timestamp):
+        response = error = None
+        try:
+            items = [(text, self.read_entities(entities)) for text, entities in texts]
+            response = self.build_response(texts, self.translator.translate(items, language))
+        except Exception as failure:
+            self.log("translation failed: %s" % failure)
+            error = jclass("org.telegram.tgnet.TLRPC$TL_error")()
+            error.code = 400
+            error.text = "TRANSLATION_FAILED"
+        if on_complete is not None:
+            on_complete.run(response, error)
+        elif on_timestamp is not None:
+            on_timestamp.run(response, error, 0)
+
+    @staticmethod
+    def read_entities(entities):
+        if entities is None:
+            return []
+        return [
+            (entity.getClass().getName(), int(entity.offset), int(entity.length))
+            for entity in entities
+        ]
+
+    @staticmethod
+    def clone_entity(entity, offset, length):
+        """A serialized copy, so the message's own entities keep their offsets."""
+        data = jclass("org.telegram.tgnet.SerializedData")
+        out = data(entity.getObjectSize())
+        entity.serializeToStream(out)
+        source = data(out.toByteArray())
+        copy = jclass("org.telegram.tgnet.TLRPC$MessageEntity").TLdeserialize(
+            source, source.readInt32(False), False
+        )
+        out.cleanup()
+        source.cleanup()
+        copy.offset = offset
+        copy.length = length
+        return copy
+
+    def build_response(self, texts, translated):
+        array = jclass("java.util.ArrayList")
+        result = jclass("org.telegram.tgnet.TLRPC$TL_messages_translateResult")()
+        result.result = array()
+        for (_source, entities), (text, ranges) in zip(texts, translated):
+            item = jclass("org.telegram.tgnet.TLRPC$TL_textWithEntities")()
+            item.text = text
+            item.entities = array()
+            originals = list(entities) if entities is not None else []
+            for entity, (offset, length) in zip(originals, ranges):
+                if length > 0:
+                    item.entities.add(self.clone_entity(entity, offset, length))
+            result.result.add(item)
+        return result
+
+    # -- settings ------------------------------------------------------------
+
+    def create_settings(self):
+        primary = int(self.get_setting("primary", 0)) % len(PROVIDER_IDS)
+        rows = [
+            Header(text=t("services")),
+            Selector(
+                key="primary", text=t("primary"), default=0, items=PROVIDER_NAMES,
+                on_change=lambda _value: self.reload(),
+            ),
+        ]
+        for index, pid in enumerate(PROVIDER_IDS):
+            if index != primary:
+                rows.append(Switch(
+                    key="backup_" + pid, text=t("backup", name=PROVIDER_NAMES[index]), default=False,
+                ))
+        rows.append(Text(text=t("testing") if self.testing else t("test"), accent=True,
+                         on_click=lambda _view: self.test()))
+        for line, successful in self.results:
+            rows.append(Text(text=line, red=not successful))
+        rows.append(Divider(text=t("backup_info") if len(self.order()) > 1 else t("privacy")))
+        rows += [
+            Header(text=t("community")),
+            Text(text=t("channel"), on_click=lambda _view: self.open(CHANNEL_URL)),
+            Text(text=t("github"), on_click=lambda _view: self.open(GITHUB_URL)),
+        ]
+        return rows
+
+    def reload(self):
+        self.set_setting("refresh", time.time(), reload_settings=True)
+
+    def open(self, url):
+        try:
+            context = jclass("org.telegram.messenger.ApplicationLoader").applicationContext
+            jclass("org.telegram.messenger.browser.Browser").openUrl(context, url)
+        except Exception:
+            pass
+
+    def test(self):
+        if self.testing:
+            return
+        self.testing = True
+        self.results = []
+        self.reload()
+
+        def work():
+            language = app_language()
+            for pid in self.order():
+                provider = self.translator.providers[pid]
+                started = time.time()
+                try:
+                    provider.translate(["Hello world"], language, ATTEMPT_SECONDS)
+                    status, successful = t("success"), True
+                except Exception as error:
+                    status, successful = (str(error) or t("failed")), False
+                ms = int((time.time() - started) * 1000)
+                self.results.append((t("result", name=provider.name, status=status, ms=ms), successful))
+            self.testing = False
+            self.reload()
+
+        run_on_queue(work)

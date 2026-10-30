@@ -7,9 +7,10 @@
     "check": "tsc --noEmit && inu check --no-typecheck",
     "build": "inu build",
     "test": "node --test tests/*.test.cjs",
+    "test:extera": "python3 -m unittest discover -s extera -p \"test_*.py\"",
     "format": "prettier --write src scripts tests inu.config.ts",
     "format:check": "prettier --check src scripts tests inu.config.ts",
-    "verify": "npm run format:check && npm run check && npm run build && npm test",
+    "verify": "npm run format:check && npm run check && npm run build && npm test && npm run test:extera",
     "package": "node scripts/package.cjs",
     "notes": "esbuild scripts/release-notes.js --bundle --platform=node --format=cjs --outfile=dist/release-notes.cjs && node dist/release-notes.cjs"
   },
