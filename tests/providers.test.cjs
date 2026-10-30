@@ -48,7 +48,7 @@ test('Google 429 respects Retry-After, stops requests across chats, and persists
   await assert.rejects(run(reloaded, [{ text: 'Reloaded' }]), /limiting requests/);
 });
 
-test('Google serializes different target-language batches with minimum spacing', async () => {
+test('Google spaces queued batches by a second while text waits', async () => {
   const starts = [];
   let active = 0,
     maxActive = 0;
@@ -73,6 +73,45 @@ test('Google serializes different target-language batches with minimum spacing',
   );
   assert.equal(starts.length, 2);
   assert.equal(maxActive, 1);
+  assert.ok(starts[1] - starts[0] >= 950);
+  assert.ok(starts[1] - starts[0] < 1750);
+});
+
+test('a whole article sent at once is translated by Google in time, with requests overlapping', async () => {
+  const hosts = new Set();
+  let active = 0,
+    maxActive = 0;
+  const h = harness({}, async (url, options) => {
+    hosts.add(new URL(url).host);
+    active++;
+    maxActive = Math.max(maxActive, active);
+    await new Promise((r) => setTimeout(r, 1500));
+    active--;
+    return googleReply(new URLSearchParams(options.body).getAll('q').map((q) => 'tr ' + q));
+  });
+  // Inugram sends an article as many 20-text requests at the same moment.
+  const chunks = Array.from({ length: 11 }, (_, chunk) =>
+    run(
+      h,
+      Array.from({ length: 20 }, (_, i) => ({ text: `Paragraph ${chunk}.${i}` })),
+    ),
+  );
+  const results = await Promise.all(chunks);
+  assert.equal(results.flat().length, 220);
+  assert.equal(results[10][19].text, 'tr Paragraph 10.19');
+  assert.deepEqual([...hosts], ['translate.googleapis.com']);
+  assert.ok(maxActive > 1);
+});
+
+test('Google keeps its full spacing between separate messages', async () => {
+  const starts = [];
+  const h = harness({}, async (_url, options) => {
+    starts.push(Date.now());
+    return googleReply([googleText(options)]);
+  });
+  await run(h, [{ text: 'Hello' }]);
+  await run(h, [{ text: 'Again' }]);
+  assert.equal(starts.length, 2);
   assert.ok(starts[1] - starts[0] >= 1750);
 });
 
@@ -363,7 +402,7 @@ test('provider cooldowns are independent and persisted', async () => {
 test('excessive source text, message counts and entity counts are rejected before HTTP', async () => {
   const h = harness();
   for (const texts of [
-    [{ text: 'x'.repeat(18001) }],
+    [{ text: 'x'.repeat(26001) }],
     Array.from({ length: 101 }, () => ({ text: 'hello' })),
     [
       {
@@ -378,6 +417,17 @@ test('excessive source text, message counts and entity counts are rejected befor
   ]) {
     await assert.rejects(run(h, texts), /Too much text/);
   }
+});
+
+test("an article chunk of Inugram's full 25,000 characters is accepted", async () => {
+  const h = harness({}, async (_url, options) =>
+    googleReply(googleTexts(options).map(() => 'Merhaba')),
+  );
+  const texts = Array.from({ length: 20 }, (_, i) => ({
+    text: 'Paragraph ' + i + ' ' + 'a'.repeat(1230),
+  }));
+  const result = await run(h, texts);
+  assert.equal(result.length, 20);
 });
 
 test('malformed Google rows and excessive translated batches are rejected', async () => {

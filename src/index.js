@@ -7,7 +7,6 @@
 import { registeredProviderId } from './identity.js';
 import { createYandexProvider } from './providers/yandex.js';
 import { createGoogleProvider } from './providers/google.js';
-import { createDeepLProvider } from './providers/deepl.js';
 import { createMicrosoftProvider } from './providers/microsoft.js';
 import { onProviderSwitch, withFallback } from './fallback.js';
 import { createChatNotice } from './chat-notice.js';
@@ -16,19 +15,18 @@ import { registerDescription } from './description.js';
 import { registerSettings } from './settings.js';
 import { createProviderSelection } from './provider-selection.js';
 import { registerChatMenu } from './chat-menu.js';
+import { registerArticleMenu } from './article-menu.js';
+import { registerArticleBar } from './article-bar.js';
 import { registerProfileTranslation } from './profile-translation.js';
 import { registerDraftTranslation } from './draft-translation.js';
 import { registerKeepOriginal } from './keep-original.js';
 import { registerRestrictedLanguages } from './restricted-languages.js';
 
-const providers = [
-  createGoogleProvider(),
-  createYandexProvider(),
-  createMicrosoftProvider(),
-  createDeepLProvider(),
-];
+const providers = [createGoogleProvider(), createYandexProvider(), createMicrosoftProvider()];
 const selection = createProviderSelection(providers);
 const chatMenu = registerChatMenu(providers, selection);
+const articleMenu = registerArticleMenu(providers, selection);
+registerArticleBar(articleMenu);
 registerProfileTranslation(providers, selection);
 const draftTranslation = registerDraftTranslation(providers, selection);
 registerKeepOriginal();

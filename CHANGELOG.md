@@ -1,5 +1,15 @@
 # Changelog
 
+## 1.3.0
+
+### Translation
+
+- Translate articles (Instant View), long ones included, with a translate bar like the one in chats. Its menu switches services, translating the article again, and hides it, showing the original; Translate in the article menu brings it back.
+
+### Providers
+
+- DeepL is removed; it was too limited to be useful.
+
 ## 1.2.0
 
 ### Translation

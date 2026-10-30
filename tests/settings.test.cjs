@@ -17,7 +17,7 @@ const { dragRuntime, nativeOrderPage } = require('./helpers/native-runtime.cjs')
 
 test('Chatlate registers keyless providers and defaults to English', () => {
   const h = harness();
-  assert.equal(h.registered.size, 4);
+  assert.equal(h.registered.size, 3);
   assert.equal(h.registered.get('chatlate.google').name, 'Google');
   assert.equal(h.registered.get('chatlate.microsoft').name, 'Microsoft');
   assert.equal(h.registered.get('chatlate.google').format, 'entities');

@@ -110,7 +110,7 @@ const orderAction = (h, label) => {
   selected.onClick();
 };
 const chooseProvider = (h, index) => {
-  const name = ['Google', 'Yandex', 'Microsoft', 'DeepL'][index];
+  const name = ['Google', 'Yandex', 'Microsoft'][index];
   const rows = openOrder(h)
     .items()
     .filter((row) => row.id?.startsWith('order.'));

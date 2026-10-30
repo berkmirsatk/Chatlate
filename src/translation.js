@@ -1,6 +1,9 @@
 import { t } from './i18n.js';
 import { plan, assemble, validate } from './formatting.js';
 
+// Inugram's article translator sends up to 25,000 characters in one request.
+const MAX_REQUEST_CHARS = 26000;
+
 /**
  * Preserve Telegram entities while translating only unprotected text fragments.
  * @param {import('./provider.js').Provider} provider
@@ -12,7 +15,7 @@ export function createTranslator(provider) {
       if (request.signal.aborted) throw new Error(t('cancelled'));
       if (
         request.texts.length > 100 ||
-        request.texts.reduce((size, input) => size + input.text.length, 0) > 18000 ||
+        request.texts.reduce((size, input) => size + input.text.length, 0) > MAX_REQUEST_CHARS ||
         request.texts.some((input) => (input.entities?.length ?? 0) > 1000)
       )
         throw new Error(t('tooLarge'));
@@ -28,7 +31,8 @@ export function createTranslator(provider) {
           .map(() => (typeof request.from?.[i] === 'string' ? request.from[i] : null)),
       );
       // The host enforces a 30-second budget; bound payload size and queue pressure.
-      if (parts.length > 100 || parts.join('').length > 18000) throw new Error(t('tooLarge'));
+      if (parts.length > 100 || parts.join('').length > MAX_REQUEST_CHARS)
+        throw new Error(t('tooLarge'));
       const translated = parts.length
         ? validate(
             await provider.translateParts(parts, request.to, request.signal, sources),

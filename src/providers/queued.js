@@ -7,7 +7,10 @@ import { MAX_COOLDOWN_MS, TRANSLATION_BUDGET_MS } from '../limits.js';
 
 const MIN_REQUEST_INTERVAL_MS = 1800;
 const BATCH_MAX_CHARS = 3500;
-const MAX_QUEUE_ENTRIES = 200;
+// An article arrives as many requests at once.
+const MAX_QUEUE_ENTRIES = 1000;
+const MAX_IN_FLIGHT = 3;
+const MAX_BATCH_ENTRIES = 40;
 const COLLECTION_WINDOW_MS = 60;
 /** @type {[string, RegExp][]} */
 const SCRIPTS = [
@@ -41,7 +44,8 @@ function writingSystem(text) {
  * `batchSize` measures a fragment against `batchLimit` when a service bounds its request size.
  * Services that detect one language per request keep each batch to one language or script;
  * `detectsEachText` lifts that for services that detect every text separately.
- * @param {{id: string, name: string, fetchParts: (texts: string[], to: string, signal: AbortSignal) => Promise<string[]>, batchSize?: (text: string) => number, batchLimit?: number, detectsEachText?: boolean}} config
+ * `busyInterval` spaces requests while more text is waiting, such as a long article.
+ * @param {{id: string, name: string, fetchParts: (texts: string[], to: string, signal: AbortSignal) => Promise<string[]>, batchSize?: (text: string) => number, batchLimit?: number, detectsEachText?: boolean, busyInterval?: number}} config
  * @returns {import('../provider.js').Provider}
  */
 export function createQueuedProvider({
@@ -51,6 +55,7 @@ export function createQueuedProvider({
   batchSize = (text) => text.length,
   batchLimit = BATCH_MAX_CHARS,
   detectsEachText = false,
+  busyInterval = MIN_REQUEST_INTERVAL_MS,
 }) {
   // One shared queue across all chats and the connection-test button.
   const cache = createCache((value) => value.length);
@@ -71,16 +76,62 @@ export function createQueuedProvider({
     if (pending.get(entry.key) === entry) pending.delete(entry.key);
     for (const waiter of [...entry.waiters]) waiter.finish(error, value);
   }
+  /** @param {any[]} entries @param {string} to */
+  async function send(entries, to) {
+    const controller = new AbortController();
+    for (const entry of entries)
+      entry.cancelBatch = () => {
+        if (entries.every((e) => !e.waiters.size)) controller.abort();
+      };
+    try {
+      const results = validate(
+        await fetchParts(
+          entries.map((entry) => entry.text),
+          to,
+          controller.signal,
+        ),
+        entries.length,
+      );
+      consecutive429 = 0;
+      for (let i = 0; i < entries.length; i++) {
+        cache.set(entries[i].key, results[i]);
+        finishEntry(entries[i], null, results[i]);
+      }
+    } catch (error) {
+      if (error instanceof HttpError && error.rateLimited) {
+        consecutive429++;
+        const backoff = Math.min(MAX_COOLDOWN_MS, 60000 * 2 ** Math.min(consecutive429 - 1, 4));
+        blockedUntil = Date.now() + Math.max(backoff, error.retryAfterMs);
+        // Reloading the plugin must not immediately hammer an already limited service.
+        try {
+          put(id + '.blockedUntil', String(blockedUntil));
+        } catch {}
+        error = cooldownError();
+      }
+      for (const entry of entries) finishEntry(entry, error);
+    } finally {
+      for (const entry of entries) entry.cancelBatch = null;
+    }
+  }
+  /** Batches start one interval apart; a long backlog keeps a few requests in flight at once. */
   async function processQueue() {
     if (running) return;
     running = true;
+    /** @type {Set<Promise<void>>} */
+    const inFlight = new Set();
     try {
       // Collect same-turn requests from different chats into one HTTP request.
       await new Promise((resolve) => setTimeout(() => resolve(undefined), COLLECTION_WINDOW_MS));
-      while (pending.size) {
+      for (;;) {
         if (blockedUntil > Date.now()) {
-          for (const entry of [...pending.values()]) finishEntry(entry, cooldownError());
-          break;
+          for (const entry of [...pending.values()])
+            if (!entry.sending) finishEntry(entry, cooldownError());
+        }
+        const waiting = [...pending.values()].some((entry) => !entry.sending);
+        if (!waiting || inFlight.size >= MAX_IN_FLIGHT) {
+          if (!inFlight.size) break;
+          await Promise.race(inFlight);
+          continue;
         }
         const delay = nextStart - Date.now();
         if (delay > 0) await new Promise((resolve) => setTimeout(() => resolve(undefined), delay));
@@ -89,6 +140,7 @@ export function createQueuedProvider({
           group = '',
           size = 0;
         for (const entry of pending.values()) {
+          if (entry.sending) continue;
           if (!entry.waiters.size) {
             pending.delete(entry.key);
             continue;
@@ -100,44 +152,14 @@ export function createQueuedProvider({
           to = entry.to;
           group = entry.group;
           size += batchSize(entry.text) + 40;
-          if (entries.length >= 40) break;
+          if (entries.length >= MAX_BATCH_ENTRIES) break;
         }
         if (!entries.length) continue;
-        const controller = new AbortController();
-        for (const entry of entries)
-          entry.cancelBatch = () => {
-            if (entries.every((e) => !e.waiters.size)) controller.abort();
-          };
-        try {
-          nextStart = Date.now() + MIN_REQUEST_INTERVAL_MS;
-          const results = validate(
-            await fetchParts(
-              entries.map((entry) => entry.text),
-              to,
-              controller.signal,
-            ),
-            entries.length,
-          );
-          consecutive429 = 0;
-          for (let i = 0; i < entries.length; i++) {
-            cache.set(entries[i].key, results[i]);
-            finishEntry(entries[i], null, results[i]);
-          }
-        } catch (error) {
-          if (error instanceof HttpError && error.rateLimited) {
-            consecutive429++;
-            const backoff = Math.min(MAX_COOLDOWN_MS, 60000 * 2 ** Math.min(consecutive429 - 1, 4));
-            blockedUntil = Date.now() + Math.max(backoff, error.retryAfterMs);
-            // Reloading the plugin must not immediately hammer an already limited service.
-            try {
-              put(id + '.blockedUntil', String(blockedUntil));
-            } catch {}
-            error = cooldownError();
-          }
-          for (const entry of entries) finishEntry(entry, error);
-        } finally {
-          for (const entry of entries) entry.cancelBatch = null;
-        }
+        for (const entry of entries) entry.sending = true;
+        const busy = [...pending.values()].some((entry) => !entry.sending);
+        nextStart = Date.now() + (busy ? busyInterval : MIN_REQUEST_INTERVAL_MS);
+        const task = send(entries, to).finally(() => inFlight.delete(task));
+        inFlight.add(task);
       }
     } finally {
       running = false;
@@ -158,7 +180,7 @@ export function createQueuedProvider({
         : from
           ? 'language:' + from
           : 'script:' + writingSystem(text);
-      entry = { key, text, to, group, waiters: new Set(), cancelBatch: null };
+      entry = { key, text, to, group, waiters: new Set(), cancelBatch: null, sending: false };
       pending.set(key, entry);
     }
     const promise = new Promise((resolve, reject) => {
@@ -203,7 +225,18 @@ export function createQueuedProvider({
       );
     },
     clearCache: () => cache.clear(),
-    queueDelay: () => Math.max(0, nextStart - Date.now()),
+    // Text already waiting is sent first, so count its batches too.
+    queueDelay() {
+      let size = 0,
+        count = 0;
+      for (const entry of pending.values())
+        if (!entry.sending) {
+          size += batchSize(entry.text) + 40;
+          count++;
+        }
+      const batches = Math.max(Math.ceil(size / batchLimit), Math.ceil(count / MAX_BATCH_ENTRIES));
+      return Math.max(0, nextStart - Date.now()) + batches * busyInterval;
+    },
     cooldownMessage: () => (blockedUntil > Date.now() ? cooldownError().message : ''),
   };
 }

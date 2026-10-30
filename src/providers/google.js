@@ -21,6 +21,8 @@ export function createGoogleProvider() {
     batchLimit: MAX_ENCODED_BATCH,
     // Each text is detected separately, so one request may mix languages.
     detectsEachText: true,
+    // A long backlog, such as an article, is sent faster than single messages.
+    busyInterval: 1000,
     async fetchParts(texts, to, signal) {
       const body = texts.map((text) => 'q=' + encodeURIComponent(escape(text))).join('&');
       // The queue may contain one fragment that exceeds the entire batch budget.

@@ -35,6 +35,8 @@ export function createMicrosoftProvider() {
     batchLimit: MAX_BATCH_CHARS,
     // Each text is detected separately, so one request may mix languages.
     detectsEachText: true,
+    // A long backlog, such as an article, is sent faster than single messages.
+    busyInterval: 1000,
     async fetchParts(texts, to, signal) {
       let data;
       try {
