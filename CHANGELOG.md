@@ -4,8 +4,7 @@
 
 ### Translation
 
-- Articles get a translate bar like the one in chats. Its menu switches services, translating the article again, and hides it, showing the original; Translate in the article menu brings it back.
-- Long articles translate faster and no longer leave parts untranslated.
+- Translate articles (Instant View), long ones included, with a translate bar like the one in chats. Its menu switches services, translating the article again, and hides it, showing the original; Translate in the article menu brings it back.
 
 ### Providers
 
