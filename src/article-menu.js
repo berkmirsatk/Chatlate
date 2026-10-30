@@ -10,7 +10,7 @@ import { t } from './i18n.js';
  */
 export function registerArticleMenu(providers, selection) {
   let title = '';
-  /** @type {{options: any, picker: any, viewer: any} | undefined} */
+  /** @type {{options: any, viewer: any, active: import('./provider.js').Provider} | undefined} */
   let menu;
   function refresh() {
     title = t('translationService');
@@ -20,21 +20,9 @@ export function registerArticleMenu(providers, selection) {
     const helper = inu.jvm.cls('desu.inugram.helpers.translate.InstantViewHelper');
     const config = inu.jvm.cls('desu.inugram.InuConfig');
     const utilities = inu.jvm.cls('org.telegram.messenger.AndroidUtilities');
+    const itemOptions = inu.jvm.cls('org.telegram.ui.Components.ItemOptions');
+    const theme = inu.jvm.cls('org.telegram.ui.ActionBar.Theme');
     // Runnables are created here, on the plugin thread; menu callbacks only use them.
-    const open = inu.jvm.runnable(() => {
-      try {
-        menu?.options.call('openSwipeback', menu.picker);
-      } catch {
-        /* the menu already closed */
-      }
-    });
-    const back = inu.jvm.runnable(() => {
-      try {
-        menu?.options.call('closeSwipeback');
-      } catch {
-        /* the menu already closed */
-      }
-    });
     const picks = providers.map((provider) =>
       inu.jvm.runnable(() => {
         const current = menu;
@@ -48,6 +36,64 @@ export function registerArticleMenu(providers, selection) {
         setTimeout(() => choose(provider.id, current.viewer), 0);
       }),
     );
+    // The article menu has no swipeback page, so the services open as a second menu in its place.
+    const open = inu.jvm.runnable(() => {
+      const current = menu;
+      if (!current) return;
+      try {
+        const container = current.options.getField('container');
+        const button = current.options.getField('scrimView');
+        current.options.call('dismiss');
+        const picker = itemOptions.callStatic(
+          'makeOptions(Landroid/view/ViewGroup;Landroid/view/View;)Lorg/telegram/ui/Components/ItemOptions;',
+          container,
+          button,
+        );
+        style(picker, button.call('getParent'));
+        for (const [index, provider] of providers.entries())
+          picker.call(
+            'addChecked(ZLjava/lang/CharSequence;Ljava/lang/Runnable;)Lorg/telegram/ui/Components/ItemOptions;',
+            provider === current.active,
+            provider.name,
+            picks[index],
+          );
+        picker.call('show()Lorg/telegram/ui/Components/ItemOptions;');
+        menu = { ...current, options: picker };
+      } catch {
+        /* the article already closed */
+      }
+    });
+
+    /** Matches the article menu's own colours and position. @param {any} picker @param {any} bar */
+    function style(picker, bar) {
+      const background = bar.getField('menuBackgroundColor');
+      const text = bar.getField('menuTextColor');
+      picker.call('setDimAlpha(I)Lorg/telegram/ui/Components/ItemOptions;', 0);
+      picker.call(
+        'setColors(II)Lorg/telegram/ui/Components/ItemOptions;',
+        text,
+        bar.getField('menuIconColor'),
+      );
+      picker.call(
+        'translate(FF)Lorg/telegram/ui/Components/ItemOptions;',
+        0,
+        -utilities.callStatic('dp(F)I', 52),
+      );
+      picker.call('setMinWidth(I)Lorg/telegram/ui/Components/ItemOptions;', 200);
+      picker.call(
+        'setSelectorColor(I)Lorg/telegram/ui/Components/ItemOptions;',
+        theme.callStatic(
+          'blendOver(II)I',
+          background,
+          theme.callStatic('multAlpha(IF)I', text, 0.1),
+        ),
+      );
+      const light = utilities.callStatic('computePerceivedBrightness(I)F', background) > 0.721;
+      picker.call(
+        'setBackgroundColor(I)Lorg/telegram/ui/Components/ItemOptions;',
+        light ? 0xffffffff | 0 : 0xff1f1f1f | 0,
+      );
+    }
 
     /** @param {string} id @param {any} viewer */
     function choose(id, viewer) {
@@ -94,26 +140,6 @@ export function registerArticleMenu(providers, selection) {
           );
           if (!active) return;
           const drawables = inu.jvm.cls('org.telegram.messenger.R$drawable');
-          const picker = options.call('makeSwipeback');
-          // ItemOptions overloads `add` by argument types, so name the one meant.
-          picker.call(
-            'add(ILjava/lang/CharSequence;Ljava/lang/Runnable;)Lorg/telegram/ui/Components/ItemOptions;',
-            drawables.getStaticField('ic_ab_back'),
-            inu.jvm
-              .cls('org.telegram.messenger.LocaleController')
-              .callStatic(
-                'getString',
-                inu.jvm.cls('org.telegram.messenger.R$string').getStaticField('Back'),
-              ),
-            back,
-          );
-          for (const [index, provider] of providers.entries())
-            picker.call(
-              'addChecked(ZLjava/lang/CharSequence;Ljava/lang/Runnable;)Lorg/telegram/ui/Components/ItemOptions;',
-              provider === active,
-              provider.name,
-              picks[index],
-            );
           options.call(
             'add(ILjava/lang/CharSequence;Ljava/lang/CharSequence;Ljava/lang/Runnable;)Lorg/telegram/ui/Components/ItemOptions;',
             drawables.getStaticField('msg_language'),
@@ -121,7 +147,7 @@ export function registerArticleMenu(providers, selection) {
             active.name,
             open,
           );
-          menu = { options, picker, viewer };
+          menu = { options, viewer, active };
         } catch {
           /* the stock menu still opens */
         }

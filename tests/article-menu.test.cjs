@@ -45,20 +45,31 @@ function articleRuntime({ applied = true, installed = 'installation:chatlate.goo
           }
         : undefined,
   };
-  const menu = (label) => ({
-    label,
-    items: [],
-    calls: [],
-    call(signature, ...args) {
-      const method = signature.split('(')[0];
-      // Overloaded methods must be named by their full signature.
-      if ((method === 'add' || method === 'addChecked') && !signature.includes('('))
-        throw Error('ambiguous ' + method);
-      if (method === 'makeSwipeback') return (this.picker = menu('picker'));
-      if (method === 'add' || method === 'addChecked') this.items.push([method, ...args]);
-      else this.calls.push([method, ...args]);
-    },
-  });
+  const bar = {
+    getField: (name) => ({ menuBackgroundColor: 0, menuTextColor: -1, menuIconColor: -1 })[name],
+  };
+  const button = { call: (method) => (method === 'getParent' ? bar : undefined) };
+  const menus = [];
+  const menu = (label) => {
+    const created = {
+      label,
+      items: [],
+      calls: [],
+      getField: (name) => ({ container: 'container', scrimView: button })[name],
+      call(signature, ...args) {
+        const method = signature.split('(')[0];
+        // Overloaded methods must be named by their full signature.
+        if (!signature.includes('(') && method !== 'dismiss' && method !== 'makeSwipeback')
+          throw Error('ambiguous ' + method);
+        // The article menu is made without a swipeback page.
+        if (method === 'makeSwipeback') throw Error('no swipeback');
+        if (method === 'add' || method === 'addChecked') this.items.push([method, ...args]);
+        else this.calls.push([method, ...args]);
+      },
+    };
+    menus.push(created);
+    return created;
+  };
   const options = menu('options');
   const native = {
     onUnload() {},
@@ -76,6 +87,14 @@ function articleRuntime({ applied = true, installed = 'installation:chatlate.goo
           if (method === 'runOnUIThread') return args[0]();
           if (method === 'getString') return 'Back';
           if (method === 'onClick') return clicks.push(args[0]);
+          if (method.startsWith('makeOptions')) return menu('picker');
+          if (
+            method.startsWith('dp') ||
+            method.startsWith('blendOver') ||
+            method.startsWith('multAlpha')
+          )
+            return 0;
+          if (method.startsWith('computePerceivedBrightness')) return 0;
           throw Error(name + '.' + method);
         },
       }),
@@ -84,6 +103,9 @@ function articleRuntime({ applied = true, installed = 'installation:chatlate.goo
   return {
     native,
     options,
+    get picker() {
+      return menus.find((created) => created.label === 'picker');
+    },
     clicks,
     caches,
     state,
@@ -95,7 +117,7 @@ function articleRuntime({ applied = true, installed = 'installation:chatlate.goo
   };
 }
 
-test('the article menu offers every service and marks the active one', () => {
+test('the article menu opens every service in a second menu and marks the active one', () => {
   const runtime = articleRuntime();
   harness({}, undefined, 'en', runtime.native);
   runtime.open();
@@ -105,26 +127,26 @@ test('the article menu offers every service and marks the active one', () => {
     'Translation service',
     'Google',
   ]);
-  const [back, ...choices] = runtime.options.picker.items;
-  assert.deepEqual(back.slice(0, 3), ['add', 'ic_ab_back', 'Back']);
+  runtime.options.items[0][4]();
+  assert.deepEqual(runtime.options.calls, [['dismiss']]);
+  assert.equal(runtime.picker.calls.at(-1)[0], 'show');
   assert.deepEqual(
-    choices.map(([, checked, name]) => [name, checked]),
+    runtime.picker.items.map(([, checked, name]) => [name, checked]),
     [
       ['Google', true],
       ['Yandex', false],
       ['Microsoft', false],
     ],
   );
-  runtime.options.items[0][4]();
-  assert.deepEqual(runtime.options.calls, [['openSwipeback', runtime.options.picker]]);
 });
 
 test('choosing another service translates an already translated page again', async () => {
   const runtime = articleRuntime();
   harness({}, undefined, 'en', runtime.native);
   runtime.open();
-  runtime.options.picker.items[2][3]();
-  assert.deepEqual(runtime.options.calls, [['dismiss']]);
+  runtime.options.items[0][4]();
+  runtime.picker.items[1][3]();
+  assert.deepEqual(runtime.picker.calls.at(-1), ['dismiss']);
   await new Promise((resolve) => setTimeout(resolve, 5));
   assert.equal(runtime.value, 'installation:chatlate.yandex');
   assert.deepEqual(runtime.caches, { rich: [], string: [] });
@@ -136,7 +158,8 @@ test('an untranslated page keeps its state and only the choice is saved', async 
   const runtime = articleRuntime({ applied: false });
   harness({}, undefined, 'en', runtime.native);
   runtime.open();
-  runtime.options.picker.items[3][3]();
+  runtime.options.items[0][4]();
+  runtime.picker.items[2][3]();
   await new Promise((resolve) => setTimeout(resolve, 5));
   assert.equal(runtime.value, 'installation:chatlate.microsoft');
   assert.deepEqual(runtime.clicks, []);
