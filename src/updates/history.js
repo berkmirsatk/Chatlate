@@ -9,6 +9,8 @@ import { createNotesAction } from './notes-action.js';
  * @param {import('./remote-notes.js').NotesTranslator | null} translator */
 export function createReleaseHistory(source, translator = null) {
   const cleanups = new Set();
+  /** Version pages, newest last. @type {Set<{close: () => void, dropped: () => boolean, page: any}>} */
+  const versions = new Set();
   let icon;
   try {
     icon = inu.icons.svg(HISTORY_ICON);
@@ -19,6 +21,19 @@ export function createReleaseHistory(source, translator = null) {
   }
 
   function openVersion(version) {
+    // Only the history list opens a version, so an earlier version page is closing, or the app
+    // dropped its opening because a page transition was still running. Either way it is done.
+    for (const earlier of [...versions]) {
+      const dropped = earlier.dropped();
+      earlier.close();
+      if (dropped) {
+        try {
+          earlier.page.dispose();
+        } catch {
+          /* already disposed */
+        }
+      }
+    }
     let closed = false;
     const title = 'Chatlate ' + version;
     const notes = createVersionNotes(
@@ -37,6 +52,7 @@ export function createReleaseHistory(source, translator = null) {
       translateAction.dispose();
       notes.dispose();
       cleanups.delete(close);
+      versions.delete(entry);
     }
     const page = inu.ui.settingsPage({
       title,
@@ -44,6 +60,8 @@ export function createReleaseHistory(source, translator = null) {
       onClose: close,
       items: notes.items,
     });
+    const entry = { close, dropped: () => !translateAction.found(), page };
+    versions.add(entry);
     cleanups.add(close);
     try {
       inu.ui.openPage(page);

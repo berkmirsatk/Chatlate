@@ -7,6 +7,8 @@ const FIRST_ITEM_ID = 0x43a70000;
 
 let listenerClass;
 const handlers = new Map();
+/** Pages that already carry an icon, so a second action never adds another. */
+const claimed = new Set();
 let nextId = 0;
 
 /**
@@ -19,6 +21,7 @@ export function createNotesAction(title, translation) {
   const id = FIRST_ITEM_ID + ++nextId;
   let item,
     timer,
+    page,
     disposed = false;
   let android, theme;
   // Set by the UI thread once the icon is in the action bar.
@@ -106,6 +109,11 @@ export function createNotesAction(title, translation) {
           // Replaces the menu's own handler, which would forward the tap to the page.
           added.call('setOnClickListener', listener);
           added.call('setVisibility', 8);
+          // The page may have closed while the icon was being added.
+          if (disposed) {
+            added.call('getParent')?.call('removeView', added);
+            return;
+          }
           pending.defaultColor = actionBar.getField('itemsColor');
           pending.item = added;
         } catch {
@@ -131,7 +139,13 @@ export function createNotesAction(title, translation) {
     if (disposed) return;
     try {
       const fragment = inu.android.getCurrentFragment();
-      if (fragment && String(fragment.call('getTitle')) === title) {
+      if (
+        fragment &&
+        String(fragment.call('getTitle')) === title &&
+        ![...claimed].some((other) => other.call('equals', fragment))
+      ) {
+        page = fragment;
+        claimed.add(fragment);
         attach(fragment);
         return;
       }
@@ -146,11 +160,14 @@ export function createNotesAction(title, translation) {
     attach: () => find(),
     /** Call whenever the notes or their translation change. */
     update: apply,
+    /** Whether the page was found on screen. */
+    found: () => page !== undefined,
     dispose() {
       disposed = true;
       clearTimeout(timer);
       timer = undefined;
       handlers.delete(id);
+      if (page) claimed.delete(page);
       const view = item ?? pending.item;
       item = pending.item = undefined;
       if (!view) return;
