@@ -441,6 +441,11 @@ function actionRuntime(title) {
     call: (method) => (method === 'createMenu' ? menu : context),
     getField: (name) => (assert.equal(name, 'itemsColor'), 'items colour'),
   };
+  const shown = { title };
+  const fragment = {
+    call: (method, other) =>
+      method === 'getTitle' ? shown.title : method === 'equals' ? other === fragment : actionBar,
+  };
   const cls = () => ({
     getStaticField: (field) => field,
     callStatic(method, ...args) {
@@ -451,11 +456,11 @@ function actionRuntime(title) {
   });
   return {
     added,
+    /** The title of the page on screen. @param {string} next */
+    show: (next) => (shown.title = next),
     native: {
       android: {
-        getCurrentFragment: () => ({
-          call: (method) => (method === 'getTitle' ? title : actionBar),
-        }),
+        getCurrentFragment: () => fragment,
       },
       jvm: {
         runnable: (fn) => fn,
@@ -560,4 +565,46 @@ test('an English app gets no translate icon', async () => {
   await settle();
   h.runTimers();
   assert.equal(runtime.added[0].values.setVisibility, 8);
+});
+
+test('a version opened again after a dropped tap gets one working translate icon', async () => {
+  const source = {
+    check: async () => null,
+    install: async () => {},
+    changelog: async () => [{ version: INSTALLED, notes: { en: 'An improvement' } }],
+  };
+  const runtime = actionRuntime('Chatlate ' + INSTALLED);
+  const translated = [];
+  const h = harness(
+    source,
+    '',
+    'tr',
+    {
+      language: () => 'tr',
+      translate: async (content) => (
+        translated.push(content.text),
+        { text: 'Bir iyileştirme', entities: [] }
+      ),
+    },
+    runtime.native,
+  );
+  h.controller.historyItem().onClick();
+  await settle();
+  const version = h.opened.items()[0];
+  // The app ignores the first tap while a page transition runs; the second one opens the page.
+  runtime.show('Version history');
+  version.onClick();
+  runtime.show('Chatlate ' + INSTALLED);
+  version.onClick();
+  await settle();
+  h.runTimers();
+  await settle();
+  h.runTimers();
+  assert.equal(runtime.added.length, 1);
+  runtime.tap(runtime.added[0]);
+  h.runTimers();
+  await settle();
+  h.runTimers();
+  assert.equal(notes(h.opened).text.text, 'Bir iyileştirme');
+  assert.deepEqual(translated, ['An improvement']);
 });

@@ -25,14 +25,34 @@ export function installPackage(bytes, expectedHash, version, signal) {
   }
   const fragment = inu.android.getCurrentFragment();
   if (!fragment || signal.aborted) throw Error('Update page closed');
-  // Never call PluginManager.update directly: the native sheet must display grant changes.
-  const importer = inu.jvm
-    .cls('desu.inugram.helpers.plugins.PluginImportHelper')
-    .getStaticField('INSTANCE');
+  // The JVM bridge refuses Inugram's plugin engine classes, so the package goes through the same
+  // path as a plugin file tapped in a chat: Inugram's install sheet shows grant changes.
+  const name = `Chatlate-${version}.inu.js`;
+  const constructor = (/** @type {string} */ cls, /** @type {string} */ descriptor) =>
+    inu.jvm.cls(cls).getDeclaredConstructor(descriptor);
+  const cache = inu.jvm
+    .cls('org.telegram.messenger.ApplicationLoader')
+    .getStaticField('applicationContext')
+    .call('getCacheDir');
+  const file = constructor('java.io.File', '(Ljava/io/File;Ljava/lang/String;)V').newInstance(
+    cache,
+    name,
+  );
+  const output = constructor('java.io.FileOutputStream', '(Ljava/io/File;)V').newInstance(file);
   try {
-    // Current hosts add a Kotlin default `origin` parameter, which the JVM bridge must receive.
-    importer.call('startImport', fragment, source, null);
-  } catch {
-    importer.call('startImport', fragment, source);
+    output.call('write([B)V', bytes);
+  } finally {
+    output.call('close');
   }
+  const document = constructor('org.telegram.tgnet.TLRPC$TL_document', '()V').newInstance();
+  const attribute = constructor(
+    'org.telegram.tgnet.TLRPC$TL_documentAttributeFilename',
+    '()V',
+  ).newInstance();
+  attribute.setField('file_name', name);
+  document.getField('attributes').call('add(Ljava/lang/Object;)Z', attribute);
+  const opened = inu.jvm
+    .cls('desu.inugram.helpers.chat.ChatHelper')
+    .callStatic('maybeHandleRichDocumentClick', document, file);
+  if (!opened) throw Error('Install sheet unavailable');
 }

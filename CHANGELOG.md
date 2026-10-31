@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.3.1
+
+### Updates
+
+- In-app updates install again.
+- Fix a second, unresponsive translate icon on release notes after opening versions quickly.
+
 ## 1.3.0
 
 ### Translation

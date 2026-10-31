@@ -29,7 +29,8 @@ const release = () => ({
 
 function harness(options = {}) {
   const requests = [],
-    imports = [];
+    imports = [],
+    written = new Map();
   const context = {
     Uint8Array,
     TextDecoder,
@@ -81,16 +82,44 @@ function harness(options = {}) {
                 },
               }),
             };
-          if (name.endsWith('PluginImportHelper'))
+          if (name === 'org.telegram.messenger.ApplicationLoader')
+            return { getStaticField: () => ({ call: () => 'cache' }) };
+          if (name === 'desu.inugram.helpers.chat.ChatHelper')
             return {
-              getStaticField: () => ({
-                call: (...args) => {
-                  if (options.legacyImport && args.length !== 3) throw TypeError('No overload');
-                  if (!options.legacyImport && args.length !== 4) throw TypeError('No overload');
-                  imports.push(args);
-                },
-              }),
+              callStatic: (method, document, file) => {
+                assert.equal(method, 'maybeHandleRichDocumentClick');
+                imports.push([document.attributes[0].file_name, file.path, written.get(file.path)]);
+                return !options.noSheet;
+              },
             };
+          return {
+            getDeclaredConstructor: (descriptor) => ({
+              newInstance: (...args) => {
+                if (name === 'java.io.File') return { path: args[0] + '/' + args[1] };
+                if (name === 'java.io.FileOutputStream')
+                  return {
+                    call: (method, bytes) => {
+                      if (method === 'write([B)V')
+                        written.set(args[0].path, Buffer.from(bytes).toString());
+                    },
+                  };
+                if (name.endsWith('TL_document'))
+                  return {
+                    attributes: [],
+                    getField() {
+                      return { call: (_method, item) => this.attributes.push(item) };
+                    },
+                  };
+                if (name.endsWith('TL_documentAttributeFilename'))
+                  return {
+                    setField(field, value) {
+                      this[field] = value;
+                    },
+                  };
+                throw Error('Unexpected constructor: ' + name + descriptor);
+              },
+            }),
+          };
           throw Error('Unexpected native access: ' + name);
         },
       },
@@ -182,10 +211,12 @@ test('installation rechecks the selected tag and uses the native permission shee
     [api + '/releases/tags/v9.0.1', api + '/releases/assets/42'],
   );
   assert.equal(h.requests[1].init.headers.Accept, 'application/octet-stream');
-  assert.deepEqual(h.imports, [['startImport', 'fragment', source.toString(), null]]);
-  const legacy = harness({ legacyImport: true });
-  await legacy.create(repository).install({ version: '9.0.1' }, signal());
-  assert.deepEqual(legacy.imports, [['startImport', 'fragment', source.toString()]]);
+  // The verified package opens Inugram's install sheet as a plugin file would.
+  assert.deepEqual(h.imports, [
+    ['Chatlate-9.0.1.inu.js', 'cache/Chatlate-9.0.1.inu.js', source.toString()],
+  ]);
+  const noSheet = harness({ noSheet: true });
+  await assert.rejects(noSheet.create(repository).install({ version: '9.0.1' }, signal()));
 });
 
 test('mismatched bytes, plugin identity, final host or missing page never reach native import', async () => {
