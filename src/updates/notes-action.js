@@ -95,7 +95,14 @@ export function createNotesAction(title, translation) {
       'runOnUIThread',
       inu.jvm.runnable(() => {
         try {
-          const actionBar = fragment.call('getActionBar');
+          // Inugram 13.2 gives settings pages a glass header in place of the action bar.
+          let simple;
+          try {
+            simple = fragment.call('getSimpleActionBar');
+          } catch {
+            /* older hosts have only the action bar */
+          }
+          const actionBar = simple ?? fragment.call('getActionBar');
           if (!actionBar || disposed) return;
           const context = actionBar.call('getContext');
           const icon =
@@ -105,7 +112,13 @@ export function createNotesAction(title, translation) {
             fallbackIcon;
           const added = actionBar
             .call('createMenu')
-            .call('addItem(II)Lorg/telegram/ui/ActionBar/ActionBarMenuItem;', id, icon);
+            .call(
+              simple
+                ? 'addItem(II)Lorg/telegram/ui/ActionBar/SimpleActionBarMenuItem;'
+                : 'addItem(II)Lorg/telegram/ui/ActionBar/ActionBarMenuItem;',
+              id,
+              icon,
+            );
           // Replaces the menu's own handler, which would forward the tap to the page.
           added.call('setOnClickListener', listener);
           added.call('setVisibility', 8);

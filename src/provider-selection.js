@@ -98,6 +98,18 @@ export function createProviderSelection(providers) {
         available,
       };
     },
+    /** Inugram's key of the preferred Chatlate service, or '' when it cannot be told. */
+    key() {
+      try {
+        const state = nativeState();
+        if (!state.prefix) return '';
+        const saved = providers.findIndex((provider) => provider.id === get('provider'));
+        const index = state.index >= 0 ? state.index : Math.max(0, saved);
+        return state.prefix + registeredProviderId(providers[index].id);
+      } catch {
+        return '';
+      }
+    },
     /** @param {number} index @returns {'applied' | 'inactive' | 'unavailable'} */
     select(index) {
       const provider = providers[index];

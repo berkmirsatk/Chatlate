@@ -1,5 +1,15 @@
 # Changelog
 
+## 1.4.0
+
+### Translation
+
+- Translate Inugram's What's new: a translate icon on the settings page and on the sheet shown after an update, like the one on Chatlate's release notes.
+
+### Fixes
+
+- The translate icon on Chatlate's release notes shows again on Inugram 13.2 and later.
+
 ## 1.3.1
 
 ### Updates

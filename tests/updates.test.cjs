@@ -413,7 +413,7 @@ test('missing GitHub release links show a localized message without opening anot
   assert.equal(h.toasts.at(-1), 'Sürüm bağlantısı mevcut değil');
 });
 
-function actionRuntime(title) {
+function actionRuntime(title, { glass = false } = {}) {
   const added = [];
   class View {
     constructor() {
@@ -431,6 +431,7 @@ function actionRuntime(title) {
     call(method, id, icon) {
       assert.match(method, /^addItem\(II\)/);
       const item = new View();
+      item.kind = method.split('/').pop();
       item.values.setTag = id;
       item.icon = icon;
       added.push(item);
@@ -444,7 +445,15 @@ function actionRuntime(title) {
   const shown = { title };
   const fragment = {
     call: (method, other) =>
-      method === 'getTitle' ? shown.title : method === 'equals' ? other === fragment : actionBar,
+      method === 'getTitle'
+        ? shown.title
+        : method === 'equals'
+          ? other === fragment
+          : method === 'getSimpleActionBar'
+            ? glass
+              ? actionBar
+              : null
+            : actionBar,
   };
   const cls = () => ({
     getStaticField: (field) => field,
@@ -607,4 +616,33 @@ test('a version opened again after a dropped tap gets one working translate icon
   h.runTimers();
   assert.equal(notes(h.opened).text.text, 'Bir iyileştirme');
   assert.deepEqual(translated, ['An improvement']);
+});
+
+test('the translate icon goes into the glass header of newer Inugram settings pages', async () => {
+  const source = {
+    check: async () => null,
+    install: async () => {},
+    changelog: async () => [{ version: INSTALLED, notes: { en: 'An improvement' } }],
+  };
+  for (const [glass, kind] of [
+    [true, 'SimpleActionBarMenuItem;'],
+    [false, 'ActionBarMenuItem;'],
+  ]) {
+    const runtime = actionRuntime('Chatlate ' + INSTALLED, { glass });
+    const h = harness(
+      source,
+      '',
+      'tr',
+      { language: () => 'tr', translate: async () => ({ text: 'Bir iyileştirme', entities: [] }) },
+      runtime.native,
+    );
+    h.controller.historyItem().onClick();
+    await settle();
+    h.opened.items()[0].onClick();
+    await settle();
+    h.runTimers();
+    assert.equal(runtime.added.length, 1);
+    assert.equal(runtime.added[0].kind, kind);
+    assert.equal(runtime.added[0].values.setVisibility, 0);
+  }
 });
