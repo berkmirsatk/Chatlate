@@ -17,11 +17,12 @@ function fakeView(className, extra = {}) {
     ...extra,
     call(signature, ...args) {
       const method = signature.split('(')[0];
-      if (method === 'getClass') return { call: () => className };
+      if (method === 'getClass') throw Error('jvm: no getClass');
       if (method === 'getContext') return 'context';
       if (method === 'getParent') return view.parent;
       if (method === 'equals') return args[0] === view;
       if (method === 'getTag') return view.values.setTag;
+      if (method === 'isAttachedToWindow') return view.attached !== false;
       if (method === 'addView') {
         args[0].parent = view;
         return view.children.push(args[0]);
@@ -34,7 +35,10 @@ function fakeView(className, extra = {}) {
       if (method === 'set') view.shown = args[0];
       view.values[method] = args.length > 1 ? args : args[0];
     },
-    getField: (name) => (name === 'richMessage' ? view.shown : undefined),
+    getField(name) {
+      if (name !== 'richMessage' || className !== PREVIEW) throw Error('jvm: no field ' + name);
+      return view.shown;
+    },
   };
   return view;
 }
@@ -133,10 +137,11 @@ function runtime() {
   };
 }
 
-test("What's new in settings gets a header icon that translates each release and back", async () => {
+test("What's new in settings gets a header icon that translates the releases on screen and back", async () => {
   const r = runtime();
   harness({}, undefined, 'tr', r.native);
   const views = [notes('Release 56'), notes('Release 55')];
+  views[1].attached = false;
   const originals = views.map((view) => view.shown);
   const fragment = {
     call: (method) => (method === 'getSimpleActionBar' ? r.bar : undefined),
@@ -160,7 +165,13 @@ test("What's new in settings gets a header icon that translates each release and
   assert.equal(icon.values.setEnabled, false);
   r.answer('Sürüm 56');
   assert.equal(views[0].shown.translated, 'Sürüm 56');
+  // The release further down waits until it scrolls into view.
+  assert.equal(r.requests.length, 1);
+  assert.equal(icon.values.setEnabled, true);
+  views[1].attached = true;
+  views[1].listeners[0].spec.methods.onViewAttachedToWindow.body(null, views[1]);
   assert.equal(r.requests.length, 2);
+  assert.equal(icon.values.setEnabled, false);
   r.answer('Sürüm 55');
   assert.equal(views[1].shown.translated, 'Sürüm 55');
   assert.equal(icon.values.setEnabled, true);

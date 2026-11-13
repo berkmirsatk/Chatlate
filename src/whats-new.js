@@ -3,7 +3,6 @@ import { updateMessages } from './updates/messages.js';
 
 // Views are identified by integer tags; keep clear of the host's small IDs.
 const FIRST_ID = 0x43a80000;
-const PREVIEW = 'org.telegram.messenger.RichMessageLayout$PreviewView';
 const SET = 'set(Lorg/telegram/tgnet/tl/TL_iv$RichMessage;)V';
 const ADD_VIEW = 'addView(Landroid/view/View;Landroid/view/ViewGroup$LayoutParams;)V';
 
@@ -11,6 +10,7 @@ const ADD_VIEW = 'addView(Landroid/view/View;Landroid/view/ViewGroup$LayoutParam
  * A translate icon on Inugram's What's new: the settings page, the sheet shown after an update
  * and the sheet that offers one. Like Chatlate's own release notes, it translates into the app's
  * language with the preferred Chatlate service and tapping it again shows the original.
+ * Releases are translated one at a time, and only those on screen: the rest follow on scrolling.
  * Inugram's own rich-text translator splits and rebuilds the notes, so formatting and links stay.
  * Hooks, taps and replies arrive on other threads; they only use runnables created here.
  * @param {ReturnType<typeof import('./provider-selection.js').createProviderSelection>} selection
@@ -49,7 +49,7 @@ export function registerWhatsNew(selection) {
      * One screen's notes and its icon.
      * @typedef {{id: number, icon: any, menu: boolean, color: number, views: () => any[], title?: any,
      *   entries: {view: any, original: any, translated?: any, failed?: boolean}[],
-     *   active: boolean, busy: boolean, closed: boolean, key: string, to: string}} Surface
+     *   active: boolean, busy: boolean, stalled: boolean, closed: boolean, key: string, to: string}} Surface
      */
     /** @type {Map<number, Surface>} */
     const surfaces = new Map();
@@ -87,30 +87,56 @@ export function registerWhatsNew(selection) {
       }
     }
 
+    /** @param {any} view */
+    function isNotes(view) {
+      try {
+        return !!view.getField('richMessage');
+      } catch {
+        return false;
+      }
+    }
+
     /** @param {Surface} surface */
     function collect(surface) {
       for (const view of surface.views()) {
         if (surface.entries.some((entry) => entry.view.call('equals', view))) continue;
         try {
-          if (String(view.call('getClass').call('getName')) !== PREVIEW) continue;
+          // Only the notes view has this field; the bridge offers no class check.
           const original = view.getField('richMessage');
-          if (original) surface.entries.push({ view, original });
+          if (!original) continue;
+          surface.entries.push({ view, original });
+          // Releases further down are translated when they scroll into view.
+          view.call('addOnAttachStateChangeListener', attach);
         } catch {
           /* not a notes view */
         }
       }
     }
 
-    /** Sends the next untranslated release, or finishes. UI thread. @param {Surface} surface */
+    /** An untranslated release that is on screen. @param {Surface['entries'][number]} entry */
+    function waiting(entry) {
+      if (entry.translated) return false;
+      try {
+        return !!entry.view.call('isAttachedToWindow');
+      } catch {
+        return true;
+      }
+    }
+
+    /** Sends the next release on screen, or finishes. UI thread. @param {Surface} surface */
     function next(surface) {
-      const entry = surface.closed
-        ? undefined
-        : surface.entries.find((candidate) => !candidate.translated && !candidate.failed);
+      // A failure stops the rest, so it is reported at once.
+      const entry =
+        surface.closed || surface.entries.some((candidate) => candidate.failed)
+          ? undefined
+          : surface.entries.find(waiting);
       if (!entry) {
         job = undefined;
         surface.busy = false;
         if (surface.entries.some((candidate) => candidate.failed)) {
           for (const candidate of surface.entries) candidate.failed = false;
+          // Scrolling does not try again; the next tap does.
+          surface.stalled = true;
           // Nothing was translated: back to the original state.
           if (!surface.entries.some((candidate) => candidate.translated)) surface.active = false;
           setTimeout(() => inu.ui.toast(t('connectionFailed')), 0);
@@ -190,9 +216,10 @@ export function registerWhatsNew(selection) {
           collect(surface);
           if (!surface.entries.length) return;
           surface.active = true;
+          surface.stalled = false;
           for (const entry of surface.entries)
             if (entry.translated) entry.view.call(SET, entry.translated);
-          if (surface.entries.some((entry) => !entry.translated)) {
+          if (surface.entries.some(waiting)) {
             surface.busy = true;
             next(surface);
           }
@@ -201,6 +228,22 @@ export function registerWhatsNew(selection) {
         /* the screen already closed */
       }
       paint(surface);
+    });
+    // Translates releases that scrolled into view on a translated screen. UI thread.
+    const resume = inu.jvm.runnable(() => {
+      if (job) return;
+      for (const surface of surfaces.values()) {
+        if (!surface.active || surface.busy || surface.stalled || surface.closed) continue;
+        try {
+          if (!surface.entries.some(waiting)) continue;
+          surface.busy = true;
+          paint(surface);
+          next(surface);
+          return;
+        } catch {
+          /* the screen already closed */
+        }
+      }
     });
     const click = new (inu.jvm.defineClass({
       interfaces: [inu.jvm.cls('android.view.View$OnClickListener')],
@@ -229,7 +272,7 @@ export function registerWhatsNew(selection) {
       },
     }))();
 
-    /** @param {Omit<Surface, 'id' | 'entries' | 'active' | 'busy' | 'closed' | 'key' | 'to'>} parts */
+    /** @param {Omit<Surface, 'id' | 'entries' | 'active' | 'busy' | 'stalled' | 'closed' | 'key' | 'to'>} parts */
     function open(parts) {
       /** @type {Surface} */
       const surface = {
@@ -238,6 +281,7 @@ export function registerWhatsNew(selection) {
         entries: [],
         active: false,
         busy: false,
+        stalled: false,
         closed: false,
         key: '',
         to: '',
@@ -298,6 +342,7 @@ export function registerWhatsNew(selection) {
           returns: 'void',
           body: () => {
             onUi(place);
+            onUi(resume);
           },
         },
         onViewDetachedFromWindow: {
@@ -345,11 +390,7 @@ export function registerWhatsNew(selection) {
           try {
             if (ctx.throwable || !to) return;
             const [title, ...rows] = items(ctx.thisObject?.getField('rows'));
-            if (
-              !title ||
-              !rows.some((row) => String(row.call('getClass').call('getName')) === PREVIEW)
-            )
-              return;
+            if (!title || !rows.some(isNotes)) return;
             const color = theme.callStatic('getColor', theme.getStaticField('key_dialogTextBlack'));
             const view = new ImageView(title.call('getContext'));
             view.call(

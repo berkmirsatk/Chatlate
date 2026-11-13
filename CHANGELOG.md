@@ -4,7 +4,7 @@
 
 ### Translation
 
-- Translate Inugram's What's new: a translate icon on the settings page and on the sheet shown after an update, like the one on Chatlate's release notes.
+- Translate Inugram's What's new: a translate icon on the settings page and on the sheet shown after an update, like the one on Chatlate's release notes. The releases on screen are translated first, the rest as you scroll.
 
 ### Fixes
 
