@@ -5,51 +5,10 @@ import { PLUGIN_ID, PLUGIN_DESCRIPTIONS } from './identity.js';
 export function registerDescription() {
   let override = getLanguageOverride();
   let appLanguage = getAppLanguage();
-  let snapshotLanguage = '';
   function refresh() {
     override = getLanguageOverride();
     appLanguage = getAppLanguage();
-    const language = override || appLanguage;
-    if (snapshotLanguage === language) return;
-    try {
-      const manager = inu.jvm
-        .cls('desu.inugram.helpers.plugins.PluginManager')
-        .getStaticField('INSTANCE');
-      const plugins = manager.call('plugins');
-      const matches = [];
-      for (let index = 0, size = Number(plugins.call('size')); index < size; index++) {
-        const plugin = plugins.call('get', index);
-        const manifest = plugin.call('getManifest');
-        if (manifest.call('getId') === PLUGIN_ID) matches.push({ plugin, manifest });
-      }
-      // Avoid changing another installation if the host ever allows duplicates.
-      if (matches.length !== 1) return;
-      const { plugin, manifest } = matches[0];
-      const description = PLUGIN_DESCRIPTIONS[language] || PLUGIN_DESCRIPTIONS.en;
-      const localized = new (inu.jvm.cls('java.util.LinkedHashMap'))();
-      for (const code of Object.keys(PLUGIN_DESCRIPTIONS)) localized.call('put', code, description);
-      // Manifest fields are final. Replace only our plugin's volatile manifest
-      // with a copy, so the description survives hook disposal on disable.
-      const copy = new (inu.jvm.cls('desu.inugram.core.plugins.PluginManifest'))(
-        manifest.call('getName'),
-        manifest.call('getAuthor'),
-        manifest.call('getDeclaredId'),
-        manifest.call('getVersion'),
-        description,
-        localized,
-        manifest.call('getIcon'),
-        manifest.call('getGrants'),
-        manifest.call('getPluginApi'),
-        manifest.call('getPlatform'),
-        manifest.call('getRaw'),
-      );
-      plugin.setField('manifest', copy);
-      snapshotLanguage = language;
-    } catch {
-      /* active description hooks remain the compatibility fallback */
-    }
   }
-  refresh();
   const disposers = [];
   try {
     const manifest = inu.jvm.cls('desu.inugram.core.plugins.PluginManifest');
