@@ -8,8 +8,8 @@
 
 ### Fixes
 
-- On Inugram v13.2.2-56, Translate shows in the chat menu again, chats opened by hand keep their translate bar, and the Do Not Translate list works without Premium again.
-- The translate icon on Chatlate's release notes shows again on Inugram 13.2 and later.
+- On recent Inugram versions, Translate shows in the chat menu again, chats opened by hand keep their translate bar, and the Do Not Translate list works without Premium again.
+- The translate icon on Chatlate's release notes shows again on recent Inugram versions.
 
 ## 1.3.1
 
