@@ -9,6 +9,8 @@
 ### Fixes
 
 - Fixed Translate missing from the chat menu on recent Inugram versions.
+- Fixed the translate bar closing in chats opened by hand on recent Inugram versions.
+- Fixed the Do Not Translate list without Premium on recent Inugram versions.
 - Fixed the release notes translate icon on recent Inugram versions.
 
 ## 1.3.1
