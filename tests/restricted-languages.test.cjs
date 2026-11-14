@@ -22,6 +22,7 @@ function chatRuntime(selected = 'installation:chatlate.google', options = {}) {
       get: () => (translating ? { booleanValue: () => true } : null),
     },
     isTranslatingDialog: () => translating,
+    call: (method) => (assert.equal(method, 'isTranslatingDialog'), translating),
     isTranslateDialogHidden: () => hidden,
     isDialogTranslatable() {
       const ctx = {
@@ -50,9 +51,15 @@ function chatRuntime(selected = 'installation:chatlate.google', options = {}) {
     xposed: {
       // Exercise the bundled routine's logic; Android execution is checked on the phone.
       routine: (spec, captures) =>
-        new Function(...spec.captures, `return (${spec.source})`)(...captures),
+        Object.assign(new Function(...spec.captures, `return (${spec.source})`)(...captures), {
+          native: true,
+        }),
       hookMethod(method, hook) {
         if (method === options.failMethod) throw Error('unsupported method');
+        // Like Inugram 56: one method takes routine phases or plain ones, never both.
+        const kind = (phases) => Object.values(phases).some((phase) => phase.native);
+        if (hooks.has(method) && kind(hooks.get(method)) !== kind(hook))
+          throw TypeError('xposed: cannot mix native phases and JS hooks on the same method');
         hooks.set(method, { ...hooks.get(method), ...hook });
         return () => hooks.delete(method);
       },
@@ -72,7 +79,11 @@ function chatRuntime(selected = 'installation:chatlate.google', options = {}) {
         return {
           getDeclaredMethod: (descriptor) => descriptor,
           getStaticField(field) {
-            if (field === 'INSTANCE') return { resetForDialog: (id) => resets.push(id) };
+            if (field === 'INSTANCE')
+              return {
+                resetForDialog: (id) => resets.push(id),
+                call: (method, id) => (assert.equal(method, 'resetForDialog'), resets.push(id)),
+              };
             if (field === 'TRANSLATION_PROVIDER') return config;
             if (field === 'MAX_ACCOUNT_COUNT') return 0;
             throw Error(field);
