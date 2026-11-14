@@ -17,6 +17,7 @@ import { createProviderSelection } from './provider-selection.js';
 import { registerChatMenu } from './chat-menu.js';
 import { registerArticleMenu } from './article-menu.js';
 import { registerArticleBar } from './article-bar.js';
+import { registerWhatsNew } from './whats-new.js';
 import { registerProfileTranslation } from './profile-translation.js';
 import { registerDraftTranslation } from './draft-translation.js';
 import { registerKeepOriginal } from './keep-original.js';
@@ -27,6 +28,7 @@ const selection = createProviderSelection(providers);
 const chatMenu = registerChatMenu(providers, selection);
 const articleMenu = registerArticleMenu(providers, selection);
 registerArticleBar(articleMenu);
+const whatsNew = registerWhatsNew(selection);
 registerProfileTranslation(providers, selection);
 const draftTranslation = registerDraftTranslation(providers, selection);
 registerKeepOriginal();
@@ -40,6 +42,7 @@ for (const provider of providers) {
     translate: (request) => {
       // Keeps the chat menu's label in the app's current language.
       chatMenu.refresh();
+      whatsNew.refresh();
       return translator.translate(request);
     },
   });
@@ -49,5 +52,6 @@ const refreshDescription = registerDescription();
 registerSettings(providers, selection, () => {
   refreshDescription();
   chatMenu.refresh();
+  whatsNew.refresh();
   draftTranslation.refresh();
 });

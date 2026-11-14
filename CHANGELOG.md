@@ -1,5 +1,16 @@
 # Changelog
 
+## 1.4.0
+
+### Translation
+
+- Translate Inugram's What's new: a translate icon on the settings page and on the sheet shown after an update, like the one on Chatlate's release notes. The releases on screen are translated first, the rest as you scroll.
+
+### Fixes
+
+- On recent Inugram versions, Translate shows in the chat menu again, chats opened by hand keep their translate bar, and the Do Not Translate list works without Premium again.
+- The translate icon on Chatlate's release notes shows again on recent Inugram versions.
+
 ## 1.3.1
 
 ### Updates

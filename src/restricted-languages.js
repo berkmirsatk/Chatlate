@@ -85,19 +85,24 @@ export function registerRestrictedLanguages() {
     const helper = inu.jvm
       .cls('desu.inugram.helpers.translate.TranslateHelper')
       .getStaticField('INSTANCE');
+    // One plain hook: Inugram 56 refuses routine and plain phases on the same method, and the
+    // user turns translation on or off rarely.
     hook(Controller.getDeclaredMethod('toggleTranslatingDialog(JZ)Z'), {
       // Clear manual translations before Telegram notifies the chat to show originals.
-      before: inu.xposed.routine((ctx) => {
-        if (
-          ctx.args[1] === false &&
-          selected.getValue().contains(':chatlate.') &&
-          ctx.thisObject.isTranslatingDialog(ctx.args[0])
-        )
-          helper.resetForDialog(ctx.args[0]);
-      }),
-    });
-    // Persist rare user actions on the plugin thread.
-    hook(Controller.getDeclaredMethod('toggleTranslatingDialog(JZ)Z'), {
+      before(ctx) {
+        try {
+          const id = ctx.args[0];
+          if (
+            ctx.args[1] === false &&
+            String(selected.call('getValue')).includes(':chatlate.') &&
+            ctx.thisObject?.call('isTranslatingDialog', id)
+          )
+            helper.call('resetForDialog', id);
+        } catch {
+          /* Telegram still shows the originals */
+        }
+      },
+      // Persist rare user actions on the plugin thread.
       after(ctx) {
         if (ctx.args[1] !== true) return;
         const key = chatKey(ctx);
