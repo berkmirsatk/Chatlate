@@ -74,6 +74,9 @@ function runtime({ sheet = { open: false }, whatsNewOn = true } = {}) {
     },
     jvm: {
       runnable: (fn) => fn,
+      // Runs the bundled routine's source; Android execution is checked on the phone.
+      routine: (spec, captures) =>
+        new Function(...spec.captures, `return (${spec.source})`)(...captures),
       defineClass: (spec) =>
         class extends Listener {
           constructor() {
@@ -84,6 +87,7 @@ function runtime({ sheet = { open: false }, whatsNewOn = true } = {}) {
         const short = name.split('.').pop();
         const View = function () {
           const view = fakeView(short);
+          view.kind = short;
           if (short === 'ImageView') icons.push(view);
           return view;
         };
@@ -259,7 +263,7 @@ test("after the update sheet closes, a bulletin opens the What's new page", asyn
     bulletin: (options) => (bulletins.push(options), Promise.resolve('button')),
   };
   r.native.android = {
-    getCurrentFragment: () => ({ call: (method, fragment) => presented.push([method, fragment]) }),
+    getCurrentFragment: () => ({ presentFragment: (fragment) => presented.push(fragment) }),
   };
   harness({}, undefined, 'tr', r.native);
   await new Promise((resolve) => setTimeout(resolve, 1100));
@@ -272,7 +276,7 @@ test("after the update sheet closes, a bulletin opens the What's new page", asyn
   assert.equal(bulletins[0].button, 'Aç');
   assert.equal(bulletins[0].icon, 'icon:translate');
   assert.equal(presented.length, 1);
-  assert.match(presented[0][0], /^presentFragment\(/);
+  assert.equal(presented[0].kind, 'WhatsNewActivity');
 });
 
 test('no bulletin after "Don\'t show again" or without an update sheet', async () => {

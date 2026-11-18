@@ -307,16 +307,6 @@ export function registerWhatsNew(selection) {
     // Once that sheet closes, a bulletin offers the What's new page, where the icon works.
     let caughtSheet = false;
     let watching = true;
-    /** @type {any} */
-    let presenter;
-    const openPage = inu.jvm.runnable(() => {
-      try {
-        presenter?.call('presentFragment(Lorg/telegram/ui/ActionBar/BaseFragment;)Z', new page());
-      } catch {
-        /* the app moved on */
-      }
-      presenter = undefined;
-    });
     const sheetOpen = () => {
       try {
         const ref = inu.jvm
@@ -359,8 +349,16 @@ export function registerWhatsNew(selection) {
           })
           .then((result) => {
             if (result === 'dismissed' || !watching) return;
-            presenter = inu.android.getCurrentFragment();
-            if (presenter) onUi(openPage);
+            /** @type {any} */
+            const fragment = inu.android.getCurrentFragment();
+            if (!fragment) return;
+            // A routine, not a JS runnable: the page's own hook cannot run inside plugin code,
+            // and it is what adds the translate icon.
+            onUi(
+              inu.jvm.routine(() => {
+                fragment.presentFragment(new page());
+              }),
+            );
           })
           .catch(() => {});
       };
