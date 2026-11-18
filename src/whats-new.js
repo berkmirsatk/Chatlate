@@ -3,6 +3,9 @@ import { updateMessages } from './updates/messages.js';
 
 // Views are identified by integer tags; keep clear of the host's small IDs.
 const FIRST_ID = 0x43a80000;
+const SHEET_INTERVAL_MS = 1000;
+// Long enough for the user to read the notes.
+const SHEET_CHECKS = 600;
 const SET = 'set(Lorg/telegram/tgnet/tl/TL_iv$RichMessage;)V';
 const ADD_VIEW = 'addView(Landroid/view/View;Landroid/view/ViewGroup$LayoutParams;)V';
 
@@ -300,6 +303,70 @@ export function registerWhatsNew(selection) {
       return surface;
     }
 
+    // Inugram shows its sheet after an update before plugins start, so the icon misses it.
+    // Once that sheet closes, a bulletin offers the What's new page, where the icon works.
+    let caughtSheet = false;
+    let watching = true;
+    /** @type {any} */
+    let presenter;
+    const openPage = inu.jvm.runnable(() => {
+      try {
+        presenter?.call('presentFragment(Lorg/telegram/ui/ActionBar/BaseFragment;)Z', new page());
+      } catch {
+        /* the app moved on */
+      }
+      presenter = undefined;
+    });
+    const sheetOpen = () => {
+      try {
+        const ref = inu.jvm
+          .cls('desu.inugram.helpers.update.UpdateHelper')
+          .getStaticField('whatsNewSheetActivity');
+        return !!ref?.call('get');
+      } catch {
+        return false;
+      }
+    };
+    function watchSheet() {
+      if (!to || !sheetOpen()) return;
+      let checks = 0;
+      const check = () => {
+        if (!watching || caughtSheet) return;
+        if (sheetOpen()) {
+          if (++checks < SHEET_CHECKS) setTimeout(check, SHEET_INTERVAL_MS);
+          return;
+        }
+        try {
+          const config = inu.jvm.cls('desu.inugram.InuConfig');
+          // "Don't show again" turns What's new off; leave it be.
+          if (!config.getStaticField('WHATS_NEW_ON_UPDATE').call('getValue')) return;
+        } catch {
+          /* offer it anyway */
+        }
+        if (!selection.key()) return;
+        let icon;
+        try {
+          icon = inu.icons.common('translate');
+        } catch {
+          return;
+        }
+        void inu.ui
+          .bulletin({
+            text: t('whatsNewTranslate'),
+            button: t('whatsNewOpen'),
+            icon,
+            duration: 6000,
+          })
+          .then((result) => {
+            if (result === 'dismissed' || !watching) return;
+            presenter = inu.android.getCurrentFragment();
+            if (presenter) onUi(openPage);
+          })
+          .catch(() => {});
+      };
+      setTimeout(check, SHEET_INTERVAL_MS);
+    }
+
     /** @param {Surface} surface */
     function close(surface) {
       surface.closed = true;
@@ -407,6 +474,7 @@ export function registerWhatsNew(selection) {
               ),
             );
             title.call('addOnAttachStateChangeListener', attach);
+            caughtSheet = true;
             open({ icon: view, menu: false, color, views: () => rows, title });
           } catch {
             /* the sheet stays as it is */
@@ -414,7 +482,9 @@ export function registerWhatsNew(selection) {
         },
       }),
     ];
+    watchSheet();
     inu.onUnload(() => {
+      watching = false;
       for (const dispose of disposers) dispose();
       const open = [...surfaces.values()];
       surfaces.clear();

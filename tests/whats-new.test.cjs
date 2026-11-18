@@ -44,7 +44,7 @@ function fakeView(className, extra = {}) {
 }
 const notes = (text) => fakeView(PREVIEW, { shown: { original: text } });
 
-function runtime() {
+function runtime({ sheet = { open: false }, whatsNewOn = true } = {}) {
   const hooks = new Map(),
     requests = [],
     icons = [];
@@ -95,6 +95,9 @@ function runtime() {
                 call: (method) =>
                   method === 'getValue' ? 'installation:chatlate.yandex' : undefined,
               };
+            if (field === 'whatsNewSheetActivity')
+              return sheet.open ? { call: () => 'activity' } : null;
+            if (field === 'WHATS_NEW_ON_UPDATE') return { call: () => whatsNewOn };
             return field;
           },
           getDeclaredMethod: (method) => short + '.' + method,
@@ -244,4 +247,46 @@ test('no icon for an English app or a sheet without notes', () => {
     thisObject: { getField: () => list([fakeView('TextView'), fakeView('TextView')]) },
   });
   assert.equal(r.icons.length, 0);
+});
+
+test("after the update sheet closes, a bulletin opens the What's new page", async () => {
+  const sheet = { open: true };
+  const r = runtime({ sheet });
+  const bulletins = [],
+    presented = [];
+  r.native.icons = { common: (name) => 'icon:' + name };
+  r.native.ui = {
+    bulletin: (options) => (bulletins.push(options), Promise.resolve('button')),
+  };
+  r.native.android = {
+    getCurrentFragment: () => ({ call: (method, fragment) => presented.push([method, fragment]) }),
+  };
+  harness({}, undefined, 'tr', r.native);
+  await new Promise((resolve) => setTimeout(resolve, 1100));
+  // Nothing while the sheet is open.
+  assert.equal(bulletins.length, 0);
+  sheet.open = false;
+  await new Promise((resolve) => setTimeout(resolve, 1100));
+  assert.equal(bulletins.length, 1);
+  assert.equal(bulletins[0].text, 'Inugram’daki yenilikleri çevir');
+  assert.equal(bulletins[0].button, 'Aç');
+  assert.equal(bulletins[0].icon, 'icon:translate');
+  assert.equal(presented.length, 1);
+  assert.match(presented[0][0], /^presentFragment\(/);
+});
+
+test('no bulletin after "Don\'t show again" or without an update sheet', async () => {
+  for (const options of [
+    { sheet: { open: true }, whatsNewOn: false },
+    { sheet: { open: false } },
+  ]) {
+    const r = runtime(options);
+    const bulletins = [];
+    r.native.icons = { common: () => 'icon' };
+    r.native.ui = { bulletin: (o) => (bulletins.push(o), Promise.resolve('dismissed')) };
+    harness({}, undefined, 'tr', r.native);
+    options.sheet.open = false;
+    await new Promise((resolve) => setTimeout(resolve, 1100));
+    assert.equal(bulletins.length, 0);
+  }
 });

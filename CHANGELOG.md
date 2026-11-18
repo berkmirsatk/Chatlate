@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.4.1
+
+### Translation
+
+- Added a shortcut to translate Inugram's What's new after an update.
+
 ## 1.4.0
 
 ### Translation
